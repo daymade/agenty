@@ -42,4 +42,4 @@ venv.bak/
 # Project specific
 .env
 logs/
-*.log 
+*.log visualizations/
