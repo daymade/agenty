@@ -188,4 +188,4 @@ For the PoC, this node will likely just simulate approval and proceed.
 *   **State Management:** Consider database persistence for agent state if longer-running interactions are needed.
 *   **Scalability:** Evaluate performance and potential for handling concurrent requests.
 *   **Expand Scope:** Add support for other lines of business or more complex scenarios within PPA.
-*   **Security:** Ensure proper handling of Personally Identifiable Information (PII). 
+*   **Security:** Ensure proper handling of Personally Identifiable Information (PII).

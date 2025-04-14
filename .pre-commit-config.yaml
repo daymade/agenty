@@ -33,4 +33,4 @@ repos:
           - types-requests
           - types-PyYAML
           - pydantic
-          - typing-extensions 
+          - typing-extensions

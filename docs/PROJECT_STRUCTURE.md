@@ -44,4 +44,4 @@
 ### tests/
 - Test suite for the project
 - Includes both unit tests and integration tests
-- Follows standard Python testing practices 
+- Follows standard Python testing practices

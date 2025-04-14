@@ -52,7 +52,7 @@ generation_config = genai.types.GenerationConfig(
     response_mime_type="application/json"
 )
 response = model.generate_content(
-    'prompt', 
+    'prompt',
     generation_config=generation_config
 )
 
@@ -131,4 +131,4 @@ Refer to the [Google AI documentation](https://ai.google.dev/models) for the mos
 
 For comprehensive documentation, refer to:
 - [Google AI Developer Documentation](https://ai.google.dev/)
-- [Google Genai SDK Migration Guide](https://ai.google.dev/gemini-api/docs/migrate#python) 
+- [Google Genai SDK Migration Guide](https://ai.google.dev/gemini-api/docs/migrate#python)

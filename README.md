@@ -54,7 +54,8 @@ OPENAI_API_KEY=your_openai_api_key_here
 │   └── todo.md                   # Implementation plan
 ├── src/
 │   ├── __init__.py
-│   └── ppa_agent.py              # Main agent implementation
+│   ├── ppa_agent.py              # Main agent implementation
+│   └── visualize_agent.py        # LangGraph UI visualization script
 ├── tests/
 │   └── __init__.py
 ├── .env                          # Environment variables (not in git)
@@ -70,8 +71,29 @@ This project supports multiple LLM providers:
 - **Gemini** (Primary): Using Google's `google-genai` SDK with Gemini 2.5 Pro models
 - **OpenAI** (Alternative): Using GPT models via the OpenAI API
 
-> **Note**: The project has migrated from `google-generativeai` to the newer `google-genai` SDK. 
+> **Note**: The project has migrated from `google-generativeai` to the newer `google-genai` SDK.
 > For details on this migration, see the [Google Genai Migration Guide](docs/google_genai_migration.md).
+
+## Workflow Visualization
+
+This project includes LangGraph UI visualization to help understand and debug the agent workflow:
+
+1. Run the visualization script:
+```bash
+python -m src.visualize_agent
+```
+
+2. This will generate two HTML files in the `visualizations` directory:
+   - `agent_workflow.html`: Shows the agent's workflow graph with nodes and transitions
+   - `agent_trace.html`: Demonstrates a trace of a sample execution
+
+3. Open these HTML files in your browser to interact with the visualizations.
+
+The workflow visualization provides:
+- Visual representation of the agent's state machine
+- Step-by-step execution tracing
+- Node and edge details
+- Visibility into LLM calls and state transitions
 
 ## Development
 
@@ -93,4 +115,4 @@ poetry run pytest
 
 ## License
 
-(To be determined) 
+(To be determined)

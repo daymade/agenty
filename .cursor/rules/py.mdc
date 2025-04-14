@@ -6,4 +6,4 @@ alwaysApply: false
 
 - read [PROJECT_STRUCTURE.md](mdc:docs/PROJECT_STRUCTURE.md)
 - read [python.rule](mdc:.cursor/rules/python.rule)
-- we are using conda + poetry!
+- we are using conda + poetry, do not use pip, use poetry add!

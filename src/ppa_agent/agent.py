@@ -10,8 +10,6 @@ import os
 from enum import Enum
 from typing import Any, Dict, List, Optional, TypedDict, Union
 
-from langchain_core.messages import HumanMessage
-from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
@@ -26,7 +24,7 @@ logger.setLevel(logging.DEBUG)
 if not logger.handlers:
     ch = logging.StreamHandler()
     ch.setLevel(logging.DEBUG)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
@@ -79,21 +77,21 @@ class PPAAgent:
             api_key: API key for the provider
         """
         self.provider = LLMProvider(provider)
-        
+
         if self.provider == LLMProvider.OPENAI:
             self.model = model or "gpt-4-turbo-preview"
             self.api_key = api_key or os.getenv("OPENAI_API_KEY")
             if not self.api_key:
                 raise ValueError("OpenAI API key not provided")
             self.llm = ChatOpenAI(model=self.model, api_key=self.api_key)
-        
+
         elif self.provider == LLMProvider.GEMINI:
             self.model = model or "gemini-2.5-pro-exp-03-25"
             self.api_key = api_key or os.getenv("GEMINI_API_KEY")
             if not self.api_key:
                 raise ValueError("Gemini API key not provided")
             self.llm = GeminiChatAdapter(api_key=self.api_key, model=self.model)
-        
+
         self.workflow = self._build_workflow()
 
     def _identify_intention(self, state: dict) -> dict:
@@ -117,7 +115,7 @@ class PPAAgent:
             if isinstance(response, str):
                 logger.info("Response is string, parsing as JSON")
                 result = json.loads(response)
-            elif hasattr(response, 'content'):
+            elif hasattr(response, "content"):
                 logger.info(f"Response has content attribute: {response.content}")
                 if isinstance(response.content, str):
                     try:
@@ -164,7 +162,7 @@ class PPAAgent:
             response = self.llm.invoke(prompt)
             if isinstance(response, str):
                 result = json.loads(response)
-            elif hasattr(response, 'content'):
+            elif hasattr(response, "content"):
                 if isinstance(response.content, str):
                     try:
                         result = json.loads(response.content)
@@ -190,7 +188,7 @@ class PPAAgent:
     def _analyze_information(self, state: dict) -> dict:
         """Analyze the customer information from the email."""
         state["ppa_requirements"] = PPA_REQUIREMENTS
-        
+
         # Create a prompt for the LLM to extract required information
         prompt = f"""
         Extract the following required information from the customer's email:
@@ -223,13 +221,13 @@ class PPAAgent:
                     result = json.loads(response.content)
                 except json.JSONDecodeError:
                     # If not JSON, try to extract structured data
-                    lines = response.content.split('\n')
+                    lines = response.content.split("\n")
                     customer_info = {}
                     missing_info = []
                     for line in lines:
-                        if ':' in line:
-                            key, value = line.split(':', 1)
-                            key = key.strip().lower().replace(' ', '_')
+                        if ":" in line:
+                            key, value = line.split(":", 1)
+                            key = key.strip().lower().replace(" ", "_")
                             value = value.strip()
                             if value and value != "None":
                                 customer_info[key] = value
@@ -238,7 +236,7 @@ class PPAAgent:
                     result = {
                         "customer_info": customer_info,
                         "missing_info": missing_info,
-                        "status": "info_incomplete" if missing_info else "info_complete"
+                        "status": "info_incomplete" if missing_info else "info_complete",
                     }
             else:
                 result = response.content
@@ -252,12 +250,14 @@ class PPAAgent:
                 state["missing_info"] = result["missing_info"]
                 if len(state["missing_info"]) > 0:
                     missing_fields = ", ".join(state["missing_info"])
-                    state["messages"].append({
-                        "role": "agent",
-                        "content": f"Please provide the following information: {missing_fields}",
-                        "type": "info_request",
-                        "requires_review": True,
-                    })
+                    state["messages"].append(
+                        {
+                            "role": "agent",
+                            "content": f"Please provide the following information: {missing_fields}",
+                            "type": "info_request",
+                            "requires_review": True,
+                        }
+                    )
                     state["requires_review"] = True
 
             return {"status": result.get("status", "info_incomplete")}
@@ -290,10 +290,12 @@ class PPAAgent:
         )
 
         try:
-            email_content = prompt.invoke({
-                "missing_info": ", ".join(state["missing_info"]),
-                "customer_info": json.dumps(state["customer_info"]),
-            }).content
+            email_content = prompt.invoke(
+                {
+                    "missing_info": ", ".join(state["missing_info"]),
+                    "customer_info": json.dumps(state["customer_info"]),
+                }
+            ).content
 
             message = {
                 "role": "agent",
@@ -337,7 +339,7 @@ class PPAAgent:
             response = self.llm.invoke(prompt)
             if isinstance(response, str):
                 result = json.loads(response)
-            elif hasattr(response, 'content'):
+            elif hasattr(response, "content"):
                 if isinstance(response.content, str):
                     try:
                         result = json.loads(response.content)
@@ -348,30 +350,28 @@ class PPAAgent:
                             result = {
                                 "discounts": ["safe driver"],
                                 "proof_needed": True,
-                                "message": response.content
+                                "message": response.content,
                             }
                         else:
-                            result = {
-                                "discounts": [],
-                                "proof_needed": False,
-                                "message": ""
-                            }
+                            result = {"discounts": [], "proof_needed": False, "message": ""}
                 else:
                     result = response.content
             else:
                 result = response
 
             if result.get("proof_needed"):
-                state["messages"].append({
-                    "role": "agent",
-                    "content": result["message"],
-                    "type": "discount_proof_request",
-                    "requires_review": True
-                })
+                state["messages"].append(
+                    {
+                        "role": "agent",
+                        "content": result["message"],
+                        "type": "discount_proof_request",
+                        "requires_review": True,
+                    }
+                )
                 state["requires_review"] = True
                 # Continue with quote generation even if proof is needed
                 return {"status": "no_proof_needed"}
-            
+
             return {"status": "no_proof_needed"}
 
         except Exception as e:
@@ -417,13 +417,13 @@ class PPAAgent:
             response = self.llm.invoke(prompt)
             if isinstance(response, str):
                 result = json.loads(response)
-            elif hasattr(response, 'content'):
+            elif hasattr(response, "content"):
                 if isinstance(response.content, str):
                     try:
                         result = json.loads(response.content)
                     except json.JSONDecodeError:
                         # If not JSON, try to extract structured data
-                        lines = response.content.split('\n')
+                        lines = response.content.split("\n")
                         result = {
                             "quote_id": "Q" + str(hash(state["customer_email"]))[:8],
                             "base_premium": 1000.0,
@@ -432,15 +432,11 @@ class PPAAgent:
                             "coverage": {
                                 "liability": {
                                     "bodily_injury": "100k/300k",
-                                    "property_damage": "50k"
+                                    "property_damage": "50k",
                                 },
-                                "collision": {
-                                    "deductible": 500
-                                },
-                                "comprehensive": {
-                                    "deductible": 500
-                                }
-                            }
+                                "collision": {"deductible": 500},
+                                "comprehensive": {"deductible": 500},
+                            },
                         }
                 else:
                     result = response.content
@@ -449,7 +445,7 @@ class PPAAgent:
 
             state["quote_data"] = result
             state["quote_ready"] = True
-            
+
             # Generate quote summary message
             summary = f"""
             Here's your estimated quote:
@@ -465,13 +461,10 @@ class PPAAgent:
             Quote ID: {result['quote_id']}
             """
 
-            state["messages"].append({
-                "role": "agent",
-                "content": summary,
-                "type": "quote",
-                "requires_review": True
-            })
-            
+            state["messages"].append(
+                {"role": "agent", "content": summary, "type": "quote", "requires_review": True}
+            )
+
             return {"status": "quote_generated"}
 
         except Exception as e:
@@ -505,18 +498,18 @@ class PPAAgent:
             response = self.llm.invoke(prompt)
             if isinstance(response, str):
                 result = json.loads(response)
-            elif hasattr(response, 'content'):
+            elif hasattr(response, "content"):
                 if isinstance(response.content, str):
                     try:
                         result = json.loads(response.content)
                     except json.JSONDecodeError:
                         # If not JSON, try to extract structured data
-                        lines = response.content.split('\n')
+                        lines = response.content.split("\n")
                         result = {
                             "summary": response.content,
                             "red_flags": [],
                             "follow_up_items": [],
-                            "priority": "medium"
+                            "priority": "medium",
                         }
                 else:
                     result = response.content
@@ -526,26 +519,28 @@ class PPAAgent:
             # Add review summary to state
             state["review_summary"] = result
             state["requires_review"] = True
-            
+
             # Add internal note for review
-            state["messages"].append({
-                "role": "agent",
-                "content": f"""
+            state["messages"].append(
+                {
+                    "role": "agent",
+                    "content": f"""
                 Priority: {result['priority'].upper()}
-                
+
                 Summary:
                 {result['summary']}
-                
+
                 Red Flags:
                 {chr(10).join('- ' + flag for flag in result['red_flags'])}
-                
+
                 Follow-up Items:
                 {chr(10).join('- ' + item for item in result['follow_up_items'])}
                 """,
-                "type": "review_summary",
-                "requires_review": True
-            })
-            
+                    "type": "review_summary",
+                    "requires_review": True,
+                }
+            )
+
             return {"status": "ready_for_review"}
 
         except Exception as e:
@@ -637,7 +632,7 @@ class PPAAgent:
             "missing_info": [],
             "messages": [],
             "requires_review": False,
-            "ppa_requirements": []
+            "ppa_requirements": [],
         }
 
         try:
@@ -647,22 +642,22 @@ class PPAAgent:
             logger.info(f"Intention result: {intention_result}")
             if intention_result["intent"] == "error":
                 raise Exception("Failed to identify intention")
-            
+
             # If not a new business inquiry, return early
             if intention_result["intent"] != "new_business":
                 return state
-            
+
             # Identify line of business
             logger.info("Identifying line of business...")
             lob_result = self._identify_line_of_business(state)
             logger.info(f"LOB result: {lob_result}")
             if lob_result["lob"] == "error":
                 raise Exception("Failed to identify line of business")
-            
+
             # If not PPA, return early
             if lob_result["lob"] != "PPA":
                 return state
-            
+
             # Analyze information
             logger.info("Analyzing information...")
             info_result = self._analyze_information(state)
@@ -675,13 +670,13 @@ class PPAAgent:
                 logger.info("Checking for discounts...")
                 discount_result = self._ask_for_discount_proof(state)
                 logger.info(f"Discount result: {discount_result}")
-                
+
                 # If no proof needed, generate quote
                 if discount_result["status"] == "no_proof_needed":
                     logger.info("Generating quote...")
                     quote_result = self._generate_quote(state)
                     logger.info(f"Quote result: {quote_result}")
-                    
+
                     # If quote generated, prepare agency review
                     if quote_result["status"] == "quote_generated":
                         logger.info("Preparing agency review...")
@@ -691,11 +686,13 @@ class PPAAgent:
         except Exception as e:
             logger.error(f"Error processing email: {str(e)}")
             state["requires_review"] = True
-            state["messages"].append({
-                "role": "agent",
-                "content": "I apologize, but I encountered an error while processing your request. A human agent will review your email and get back to you shortly.",
-                "type": "error",
-                "requires_review": True
-            })
+            state["messages"].append(
+                {
+                    "role": "agent",
+                    "content": "I apologize, but I encountered an error while processing your request. A human agent will review your email and get back to you shortly.",
+                    "type": "error",
+                    "requires_review": True,
+                }
+            )
 
-        return state 
+        return state

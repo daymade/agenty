@@ -36,6 +36,8 @@ pydantic = "^2.11.3"
 httpx = "^0.28.1"
 google-genai = "^1.10.0"
 zstandard = "^0.23.0"
+d3graph = "^2.5.0"
+langgraph-sdk = "^0.1.61"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.5"
@@ -90,4 +92,4 @@ minversion = "8.1"
 addopts = "-ra -q"
 testpaths = [
     "tests",
-] 
+]

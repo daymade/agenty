@@ -2,6 +2,18 @@
 
 This file contains chronological logs of significant development changes, updates, fixes, and refactorings in the PPA Agent project. Each entry should include the date, author, changes made, and any relevant context or explanation.
 
+## 2025-04-15: Added LangGraph UI Visualization
+
+**Author:** AI Assistant
+
+**Changes:**
+- Added support for LangGraph UI visualization
+- Created a simple script to launch the visualization UI
+- Updated documentation with instructions on how to use the visualization
+
+**Context:**
+LangGraph provides visualization tools that help debug and understand the flow of the agent. This addition makes it easier to observe how the agent processes information and transitions between states.
+
 ## 2025-04-15: Migration to google-genai SDK
 
 **Author:** AI Assistant
@@ -58,4 +70,4 @@ Brief explanation of why these changes were necessary.
 How the changes were tested and any relevant outcomes.
 
 **Future Considerations:**
-Any follow-up work or considerations for future development. 
+Any follow-up work or considerations for future development.

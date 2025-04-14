@@ -4,17 +4,16 @@ import json
 import logging
 import os
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, List, Optional
 
 import google.genai as genai
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import AIMessage, BaseMessage
+from langchain_core.outputs import ChatGeneration, ChatResult
 from pydantic import BaseModel, Field, PrivateAttr
 
-from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
-from langchain_core.outputs import ChatGeneration, ChatResult
-from langchain_openai import ChatOpenAI
-
 logger = logging.getLogger(__name__)
+
 
 class BaseLLMProvider(ABC):
     """Abstract base class for LLM providers."""
@@ -32,7 +31,7 @@ class BaseLLMProvider(ABC):
 
 class GeminiProvider(BaseLLMProvider):
     """Provider for Google Gemini models using google-genai SDK."""
-    
+
     api_key: str
     model: str
     _client: genai.Client = PrivateAttr()
@@ -43,7 +42,7 @@ class GeminiProvider(BaseLLMProvider):
         self.model = model
         # Initialize the client using the API key
         # The SDK will automatically pick up GOOGLE_API_KEY if api_key is None/empty
-        self._client = genai.Client(api_key=self.api_key if self.api_key else None) 
+        self._client = genai.Client(api_key=self.api_key if self.api_key else None)
 
     def generate_sync(self, prompt: str) -> str:
         """Generate text from prompt synchronously using the Gemini SDK."""
@@ -51,7 +50,7 @@ class GeminiProvider(BaseLLMProvider):
             # Use client.models.generate_content
             response = self._client.models.generate_content(
                 model=self.model,
-                contents=prompt
+                contents=prompt,
                 # No config parameter needed for basic usage
             )
             return response.text
@@ -76,7 +75,7 @@ class GeminiProvider(BaseLLMProvider):
         try:
             response = await self._client.models.generate_content_async(
                 model=self.model,
-                contents=prompt
+                contents=prompt,
                 # No config parameter needed for basic usage
             )
             return response.text
@@ -105,7 +104,7 @@ class GeminiChatAdapter(BaseChatModel):
         api_key: str,
         model: str = "gemini-2.5-pro-exp-03-25",
         temperature: float = 0.7,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> None:
         """Initialize the adapter using the Google Gemini SDK."""
         super().__init__(model=model, temperature=temperature, **kwargs)
@@ -123,15 +122,12 @@ class GeminiChatAdapter(BaseChatModel):
         """Generate completions for the given messages using google-genai."""
         # Convert LangChain messages to a single prompt string
         # TODO: Improve this to pass structured history if possible/needed
-        prompt = "\n".join(
-            f"{type(msg).__name__}: {msg.content}" 
-            for msg in messages
-        )
+        prompt = "\n".join(f"{type(msg).__name__}: {msg.content}" for msg in messages)
 
         # Create the config parameter with direct temperature and responseMimeType fields
         config = genai.types.GenerateContentConfig(
             temperature=self.temperature,
-            responseMimeType="application/json", 
+            responseMimeType="application/json",
         )
 
         try:
@@ -141,67 +137,80 @@ class GeminiChatAdapter(BaseChatModel):
                 contents=prompt,
                 config=config,
             )
-            
+
             # Handle potential errors or blocked responses
             if not response.candidates:
-                 content = "Response blocked or empty."
-                 finish_reason = "blocked"
-                 # Check for prompt feedback details
-                 if hasattr(response, 'prompt_feedback') and response.prompt_feedback and response.prompt_feedback.block_reason:
-                     content = f"Response blocked due to: {response.prompt_feedback.block_reason.name}"
-                     logger.warning(f"Gemini prompt blocked. Reason: {response.prompt_feedback.block_reason.name}. Feedback: {response.prompt_feedback}")
-                 else:
-                     logger.warning("Gemini response empty.")
-                 generation = ChatGeneration(
-                     message=AIMessage(content=content),
-                     generation_info={"finish_reason": finish_reason}
-                 )
+                content = "Response blocked or empty."
+                finish_reason = "blocked"
+                # Check for prompt feedback details
+                if (
+                    hasattr(response, "prompt_feedback")
+                    and response.prompt_feedback
+                    and response.prompt_feedback.block_reason
+                ):
+                    content = (
+                        f"Response blocked due to: {response.prompt_feedback.block_reason.name}"
+                    )
+                    logger.warning(
+                        f"Gemini prompt blocked. Reason: {response.prompt_feedback.block_reason.name}. Feedback: {response.prompt_feedback}"
+                    )
+                else:
+                    logger.warning("Gemini response empty.")
+                generation = ChatGeneration(
+                    message=AIMessage(content=content),
+                    generation_info={"finish_reason": finish_reason},
+                )
             else:
-                 # Process successful response - expecting JSON structured output
-                 response_text = response.text 
-                 # The response.text should contain the JSON string when response_mime_type="application/json" is used.
-                 # We still need to parse it, but it avoids the need for ```json``` stripping.
-                 try:
-                     # Directly parse the response text as JSON
-                     json_response = json.loads(response_text)
-                     # Ensure content is string for AIMessage (Langchain requires string content)
-                     generation = ChatGeneration(
-                         message=AIMessage(content=json.dumps(json_response)), 
-                         generation_info={"finish_reason": "stop"}
-                     )
-                 except json.JSONDecodeError as json_err:
-                     logger.warning(f"Failed to decode JSON response despite requesting JSON mime type: {json_err}. Response text: {response_text}")
-                     # Fallback to using the raw text if JSON parsing fails
-                     generation = ChatGeneration(
-                         message=AIMessage(content=response_text),
-                         generation_info={"finish_reason": "stop", "json_decode_error": str(json_err)} 
-                     )
-            
+                # Process successful response - expecting JSON structured output
+                response_text = response.text
+                # The response.text should contain the JSON string when response_mime_type="application/json" is used.
+                # We still need to parse it, but it avoids the need for ```json``` stripping.
+                try:
+                    # Directly parse the response text as JSON
+                    json_response = json.loads(response_text)
+                    # Ensure content is string for AIMessage (Langchain requires string content)
+                    generation = ChatGeneration(
+                        message=AIMessage(content=json.dumps(json_response)),
+                        generation_info={"finish_reason": "stop"},
+                    )
+                except json.JSONDecodeError as json_err:
+                    logger.warning(
+                        f"Failed to decode JSON response despite requesting JSON mime type: {json_err}. Response text: {response_text}"
+                    )
+                    # Fallback to using the raw text if JSON parsing fails
+                    generation = ChatGeneration(
+                        message=AIMessage(content=response_text),
+                        generation_info={
+                            "finish_reason": "stop",
+                            "json_decode_error": str(json_err),
+                        },
+                    )
+
             return ChatResult(generations=[generation])
-        
+
         # Specific handling for blocked prompts during the API call itself
-#        except genai.errors.BlockedPromptError as e:
-#             logger.warning(f"Gemini prompt blocked during API call: {e}")
-#             generation = ChatGeneration(
-#                 message=AIMessage(content="Prompt blocked due to safety concerns."),
-#                 generation_info={"finish_reason": "blocked"}
-#             )
-#             return ChatResult(generations=[generation])
+        #        except genai.errors.BlockedPromptError as e:
+        #             logger.warning(f"Gemini prompt blocked during API call: {e}")
+        #             generation = ChatGeneration(
+        #                 message=AIMessage(content="Prompt blocked due to safety concerns."),
+        #                 generation_info={"finish_reason": "blocked"}
+        #             )
+        #             return ChatResult(generations=[generation])
         # General exception handling
         except Exception as e:
             # Log the full traceback for better debugging
-            logger.error(f"Generation error ({type(e).__name__}): {e}", exc_info=True) 
+            logger.error(f"Generation error ({type(e).__name__}): {e}", exc_info=True)
             generation = ChatGeneration(
-                 message=AIMessage(content=f"Error during generation: {type(e).__name__}"),
-                 generation_info={"finish_reason": "error"}
-             )
+                message=AIMessage(content=f"Error during generation: {type(e).__name__}"),
+                generation_info={"finish_reason": "error"},
+            )
             return ChatResult(generations=[generation])
-
 
     @property
     def _llm_type(self) -> str:
         """Return the type of LLM."""
         return "gemini"
+
 
 class GeminiConfig(BaseModel):
     """Configuration for Gemini provider."""
@@ -214,5 +223,5 @@ class GeminiConfig(BaseModel):
         """Create a config from environment variables."""
         return cls(
             api_key=os.getenv("GEMINI_API_KEY", ""),
-            model=os.getenv("GEMINI_MODEL", "gemini-2.5-pro-exp-03-25")
-        ) 
+            model=os.getenv("GEMINI_MODEL", "gemini-2.5-pro-exp-03-25"),
+        )
