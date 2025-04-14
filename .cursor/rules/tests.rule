@@ -1,0 +1,16 @@
+{
+    "pattern": "tests/**/*.py",
+    "description": "Rules for test files",
+    "instructions": [
+        "Use pytest fixtures for test setup",
+        "Follow Arrange-Act-Assert pattern",
+        "Use descriptive test names that explain the test scenario",
+        "Mock external services and API calls",
+        "Include both positive and negative test cases",
+        "Add docstrings explaining test purpose",
+        "Use parametrized tests for multiple scenarios",
+        "Implement proper cleanup in teardown",
+        "Add appropriate markers for test categories",
+        "Include performance considerations in tests"
+    ]
+} 

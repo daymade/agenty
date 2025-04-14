@@ -4,11 +4,5 @@ channels:
   - defaults
 dependencies:
   - python=3.11
-  - pip
-  - pip:
-    - langgraph>=0.0.10
-    - langchain>=0.1.0
-    - langchain-openai>=0.0.5
-    - python-dotenv>=1.0.0
-    - pydantic>=2.0.0
-    - typing-extensions>=4.5.0 
+  - pip # Poetry might need pip
+# Other dependencies managed by Poetry via pyproject.toml

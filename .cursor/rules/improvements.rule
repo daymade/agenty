@@ -1,0 +1,20 @@
+{
+    "pattern": "src/ppa_agent/**/*.py",
+    "description": "Improvements needed in the codebase",
+    "instructions": [
+        "Move prompts to separate files in prompts/ directory",
+        "Add more comprehensive docstrings to all node functions",
+        "Use structured ChatPromptTemplate instead of raw strings",
+        "Add input/output type hints to all functions",
+        "Add validation for state transitions",
+        "Implement proper cleanup in state management",
+        "Add more detailed logging for state transitions",
+        "Add unit tests for each node function",
+        "Add integration tests for the workflow",
+        "Document error handling strategies"
+    ],
+    "references": [
+        "@file:docs/system_design.md",
+        "@file:docs/todo.md"
+    ]
+} 

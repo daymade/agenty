@@ -1,6 +1,6 @@
 # PPA New Business AI Agent
 
-An AI Agent using LangGraph to automate the initial stages of Personal Private Auto (PPA) insurance new business quoting process within Mercury Insurance.
+An AI Agent using LangGraph to automate the initial stages of Personal Private Auto (PPA) insurance new business quoting process within an insurance company.
 
 ## Overview
 
@@ -18,7 +18,7 @@ For detailed system design, see [System Design Document](docs/system_design.md).
 
 - [Conda](https://docs.conda.io/en/latest/) for environment management
 - Python 3.11+
-- OpenAI API key
+- Google Gemini API key or OpenAI API key
 
 ### Environment Setup
 
@@ -36,7 +36,11 @@ conda activate ppa-agent
 
 3. Create a `.env` file in the project root:
 ```bash
-OPENAI_API_KEY=your_api_key_here
+# For Gemini API (recommended)
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# Or for OpenAI (alternative)
+OPENAI_API_KEY=your_openai_api_key_here
 ```
 
 ## Project Structure
@@ -44,18 +48,30 @@ OPENAI_API_KEY=your_api_key_here
 ```
 .
 ├── docs/
-│   ├── system_design.md   # Detailed system design documentation
-│   └── todo.md           # Implementation plan
+│   ├── system_design.md          # Detailed system design documentation
+│   ├── google_genai_migration.md # Migration guide for google-genai SDK
+│   ├── dev_logs.md               # Chronological development logs
+│   └── todo.md                   # Implementation plan
 ├── src/
 │   ├── __init__.py
-│   └── ppa_agent.py      # Main agent implementation
+│   └── ppa_agent.py              # Main agent implementation
 ├── tests/
 │   └── __init__.py
-├── .env                  # Environment variables (not in git)
+├── .env                          # Environment variables (not in git)
 ├── .gitignore
-├── environment.yml       # Conda environment specification
+├── environment.yml               # Conda environment specification
 └── README.md
 ```
+
+## Model Support
+
+This project supports multiple LLM providers:
+
+- **Gemini** (Primary): Using Google's `google-genai` SDK with Gemini 2.5 Pro models
+- **OpenAI** (Alternative): Using GPT models via the OpenAI API
+
+> **Note**: The project has migrated from `google-generativeai` to the newer `google-genai` SDK. 
+> For details on this migration, see the [Google Genai Migration Guide](docs/google_genai_migration.md).
 
 ## Development
 
@@ -63,7 +79,11 @@ Follow the implementation plan in `docs/todo.md` for step-by-step development gu
 
 ## Testing
 
-(To be implemented)
+Run the test suite using pytest:
+
+```bash
+poetry run pytest
+```
 
 ## Contributing
 

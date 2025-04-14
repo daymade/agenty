@@ -1,0 +1,16 @@
+{
+    "pattern": "src/ppa_agent/llm_providers.py",
+    "description": "Rules for LLM integration code",
+    "instructions": [
+        "Always use environment variables for API keys",
+        "Implement proper error handling for API calls",
+        "Add retry mechanisms for API requests",
+        "Include rate limiting considerations",
+        "Cache responses when appropriate",
+        "Log API usage and errors",
+        "Implement proper timeout handling",
+        "Use async/await for API calls when possible",
+        "Include type hints for all functions",
+        "Document all provider-specific requirements"
+    ]
+} 

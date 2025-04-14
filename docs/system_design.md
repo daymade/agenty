@@ -3,7 +3,7 @@
 ## 1. Introduction
 
 ### Goal
-To design and implement a Proof of Concept (PoC) AI Agent using LangGraph to automate the initial stages of the Personal Private Auto (PPA) insurance new business quoting process within Mercury Insurance.
+To design and implement a Proof of Concept (PoC) AI Agent using LangGraph to automate the initial stages of the Personal Private Auto (PPA) insurance new business quoting process within an insurance company.
 
 ### Scope
 This PoC focuses on:
@@ -18,7 +18,7 @@ This PoC focuses on:
 
 This PoC *does not* initially cover:
 *   Direct integration with email servers (sending/receiving). Assumes email content is provided as input.
-*   Integration with live Mercury Insurance quoting APIs. Mock data/logic will be used.
+*   Integration with live insurance quoting APIs. Mock data/logic will be used.
 *   Complex multi-turn conversation handling beyond the initial info request/discount check.
 *   Advanced error handling or user interface for the human agent.
 *   Support for other lines of business (Policy Change, Cancel, etc.).
@@ -181,7 +181,7 @@ For the PoC, this node will likely just simulate approval and proceed.
 ## 10. Future Considerations / Next Steps
 
 *   **Email Integration:** Implement actual email sending/receiving capabilities.
-*   **Real Quoting API:** Replace mock quote generation with calls to Mercury's internal PPA quoting API.
+*   **Real Quoting API:** Replace mock quote generation with calls to the internal PPA quoting API.
 *   **Customer Response Loop:** Fully implement `process_customer_response` and the loop back to `analyze_information`.
 *   **HITL Interface:** Develop the UI/system for the human agent review process and the mechanism to resume graph execution.
 *   **Robustness:** Enhance error handling, add validation, logging, and monitoring.

@@ -1,0 +1,16 @@
+{
+    "pattern": "*.py",
+    "description": "Rules for Python development",
+    "instructions": [
+        "Follow PEP 8 style guidelines for Python code",
+        "Use type hints for function parameters and return values",
+        "Write docstrings in Google style format",
+        "Prefer list comprehensions over map/filter when appropriate",
+        "Use f-strings for string formatting",
+        "Import statements should be organized in the following order: standard library, third-party, local",
+        "Use meaningful variable names that reflect their purpose",
+        "Include error handling with specific exception types",
+        "Add logging statements for important operations",
+        "Write unit tests for new functions"
+    ]
+} 

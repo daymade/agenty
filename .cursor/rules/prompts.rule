@@ -1,0 +1,16 @@
+{
+    "pattern": "src/ppa_agent/prompts/**/*.py",
+    "description": "Rules for LLM prompt template management",
+    "instructions": [
+        "Use ChatPromptTemplate for all LLM interactions",
+        "Include clear instructions for expected output format",
+        "Specify JSON schema when expecting structured data",
+        "Include examples in prompts when appropriate",
+        "Use system messages to set context and constraints",
+        "Keep prompts focused on single tasks",
+        "Include error handling guidance in prompts",
+        "Document expected inputs and outputs",
+        "Version prompts with clear comments",
+        "Include validation rules in prompts when needed"
+    ]
+} 

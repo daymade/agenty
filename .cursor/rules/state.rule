@@ -1,0 +1,16 @@
+{
+    "pattern": "src/ppa_agent/state.py",
+    "description": "Rules for agent state management",
+    "instructions": [
+        "Follow the AgentState TypedDict definition from system_design.md",
+        "Include type hints for all state fields",
+        "Implement state validation functions",
+        "Use immutable state updates",
+        "Include state transition logging",
+        "Document state field purposes",
+        "Implement state serialization methods",
+        "Add state schema validation",
+        "Include state cleanup methods",
+        "Document state lifecycle"
+    ]
+} 

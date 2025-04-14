@@ -1,0 +1,16 @@
+{
+    "pattern": "src/ppa_agent/agent.py",
+    "description": "Rules for PPA agent implementation using LangGraph",
+    "instructions": [
+        "Follow the state graph architecture defined in system_design.md",
+        "Implement each node function to take AgentState and return dict/AgentState",
+        "Use proper error handling for LLM calls and JSON parsing",
+        "Implement logging for each state transition and important operations",
+        "Follow the TypedDict pattern for AgentState management",
+        "Use ChatPromptTemplate for structured LLM interactions",
+        "Implement proper HITL (Human-in-the-Loop) checkpoints",
+        "Use JsonOutputParser for structured LLM outputs",
+        "Follow the Phase 1-6 implementation order from todo.md",
+        "Add comprehensive docstrings explaining node functions and state transitions"
+    ]
+} 

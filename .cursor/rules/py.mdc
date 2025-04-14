@@ -1,0 +1,9 @@
+---
+description: 
+globs: *.py
+alwaysApply: false
+---
+
+- read [PROJECT_STRUCTURE.md](mdc:docs/PROJECT_STRUCTURE.md)
+- read [python.rule](mdc:.cursor/rules/python.rule)
+- we are using conda + poetry!
