@@ -5,6 +5,7 @@ Defines the nodes (functions) used in the PPA Agent LangGraph workflow.
 import json
 import logging
 from typing import Any, Dict, List
+from datetime import datetime
 
 # Import requirements from config.py
 from . import config
@@ -26,7 +27,7 @@ from .state import AgentState
 logger = logging.getLogger(__name__)
 
 # Define prompts directly here for now
-# (Could be moved to prompts.py later)
+# Ensure prompts request ONLY JSON object output
 IDENTIFY_INTENTION_PROMPT = """
 Identify the primary intention of the *latest* customer message in the following conversation history.
 Consider the context of previous messages if needed.
@@ -37,7 +38,6 @@ Conversation History (most recent message last):
 You MUST respond with ONLY a JSON object in this exact format:
 {{
     "intent": "new_business" | "policy_change" | "provide_info" | "ask_question" | "other"
-    # Added provide_info and ask_question intents
 }}
 
 Do not include any other text, markdown, or formatting.
@@ -83,7 +83,7 @@ Aggregate all information provided by the customer throughout the history. If in
 Do not include any other text, markdown, or formatting.
 """
 
-# This prompt might need context too, but primarily focuses on the *current* missing info
+# Note: GENERATE_INFO_REQUEST_PROMPT expects plain text, not JSON
 GENERATE_INFO_REQUEST_PROMPT = """
 You are a helpful insurance agent assistant chatting with a customer.
 Based on the current state where the following information is still missing: {missing_info}
@@ -93,7 +93,6 @@ Example: "To continue with your PPA quote request, could you please provide the 
 Respond ONLY with the body of the email.
 """
 
-# This prompt should consider the full context to avoid asking redundant questions
 CHECK_DISCOUNTS_PROMPT = """
 Review the conversation history and the extracted customer information. Identify potential discounts (e.g., good student, safe driver) that *might* apply but haven't been confirmed or asked about yet.
 
@@ -114,7 +113,7 @@ If no *new* potential discounts requiring proof are identified (either none appl
 Do not include any other text, markdown, or formatting.
 """
 
-# This prompt needs full context for an accurate summary
+# Note: PREPARE_REVIEW_PROMPT expects plain text, not JSON
 PREPARE_REVIEW_PROMPT = """
 Generate a concise summary of the PPA quote case based on the entire conversation history and current state, intended for internal agency review. Highlight key customer details, the generated quote data, any remaining missing information, and any potential flags or follow-up items identified during the conversation.
 
@@ -176,28 +175,22 @@ def format_email_thread(email_thread: List[Dict[str, Any]]) -> str:
 def identify_intention(state: AgentState, llm: BaseLLMProvider) -> Dict[str, str]:
     """Node to identify the intention of the *latest* email in the thread."""
     logger.info("Identifying intention...")
-    # Use the helper to format the history
     thread_formatted = format_email_thread(state["email_thread"])
     prompt = IDENTIFY_INTENTION_PROMPT.format(email_thread_formatted=thread_formatted)
 
     try:
-        response = llm.generate_sync(prompt)
-        logger.debug(f"Raw intention response from LLM: {response}")
-        if isinstance(response, str):
-            result = json.loads(response)
-        elif hasattr(response, "content") and isinstance(response.content, str):
-            result = json.loads(response.content)
-        elif isinstance(response, dict):
-            result = response
-        else:
-            raise ValueError(f"Unexpected response type: {type(response)}")
+        # Use generate_sync and parse JSON response
+        response_str = llm.generate_sync(prompt)
+        logger.debug(f"Raw intention response from LLM: {response_str}")
+        result = json.loads(response_str)
 
-        # Add provide_info / ask_question to expected intents if needed
         intent = result.get("intent", "other")
         logger.info(f"Intention result: {{'intent': '{intent}'}}")
+        # Return only the fields relevant to AgentState update
         return {"intent": intent}
-    except Exception as e:
+    except (json.JSONDecodeError, ValueError, Exception) as e:
         logger.error(f"Error identifying intention: {e}", exc_info=True)
+        # Return error state to allow graph to route to error node
         return {"intent": "error"}
 
 
@@ -208,21 +201,15 @@ def identify_lob(state: AgentState, llm: BaseLLMProvider) -> Dict[str, str]:
     prompt = IDENTIFY_LOB_PROMPT.format(email_thread_formatted=thread_formatted)
 
     try:
-        response = llm.generate_sync(prompt)
-        logger.debug(f"Raw LOB response from LLM: {response}")
-        if isinstance(response, str):
-            result = json.loads(response)
-        elif hasattr(response, "content") and isinstance(response.content, str):
-            result = json.loads(response.content)
-        elif isinstance(response, dict):
-            result = response
-        else:
-            raise ValueError(f"Unexpected response type: {type(response)}")
+        # Use generate_sync and parse JSON response
+        response_str = llm.generate_sync(prompt)
+        logger.debug(f"Raw LOB response from LLM: {response_str}")
+        result = json.loads(response_str)
 
         lob = result.get("lob", "UNKNOWN")  # Default to UNKNOWN if unsure
         logger.info(f"LOB result: {{'lob': '{lob}'}}")
         return {"lob": lob}
-    except Exception as e:
+    except (json.JSONDecodeError, ValueError, Exception) as e:
         logger.error(f"Error identifying LOB: {e}", exc_info=True)
         return {"lob": "error"}
 
@@ -239,16 +226,10 @@ def analyze_information(state: AgentState, llm: BaseLLMProvider) -> Dict[str, An
     )
 
     try:
-        response = llm.generate_sync(prompt)
-        logger.debug(f"Raw analysis response from LLM: {response}")
-        if isinstance(response, str):
-            result = json.loads(response)
-        elif hasattr(response, "content") and isinstance(response.content, str):
-            result = json.loads(response.content)
-        elif isinstance(response, dict):
-            result = response
-        else:
-            raise ValueError(f"Unexpected response type: {type(response)}")
+        # Use generate_sync and parse JSON response
+        response_str = llm.generate_sync(prompt)
+        logger.debug(f"Raw analysis response from LLM: {response_str}")
+        result = json.loads(response_str)
 
         updates = {}
         # Update customer_info based on LLM extraction from thread
@@ -277,7 +258,7 @@ def analyze_information(state: AgentState, llm: BaseLLMProvider) -> Dict[str, An
         logger.info(f"Info analysis result: {updates}")
         return updates
 
-    except Exception as e:
+    except (json.JSONDecodeError, ValueError, Exception) as e:
         logger.error(f"Error analyzing information: {e}", exc_info=True)
         # Preserve existing state on error where possible
         return {
@@ -295,20 +276,20 @@ def generate_info_request(state: AgentState, llm: BaseLLMProvider) -> Dict[str, 
     prompt = GENERATE_INFO_REQUEST_PROMPT.format(missing_info=missing_info_str)
 
     try:
-        response_content = llm.generate_sync(prompt)
-        if hasattr(response_content, "content"):
-            response_content = response_content.content
+        # Use generate_sync, response is plain text
+        response_text = llm.generate_sync(prompt)
+        logger.debug(f"Raw info request response from LLM: {response_text}")
 
-        logger.debug(f"Generated info request email content: {response_content}")
+        # Create the message object for the state
         message = {
             "role": "agent",
-            "content": response_content,
+            "content": response_text,
             "type": "info_request",
             "requires_review": True,
         }
         current_messages = state.get("messages", [])
         return {"messages": current_messages + [message], "requires_review": True}
-    except Exception as e:
+    except (ValueError, Exception) as e:
         logger.error(f"Error generating info request: {e}", exc_info=True)
         current_messages = state.get("messages", [])
         return {
@@ -337,119 +318,95 @@ def check_for_discounts(state: AgentState, llm: BaseLLMProvider) -> Dict[str, An
     )
 
     try:
-        response = llm.generate_sync(prompt)
-        logger.debug(f"Raw discount check response from LLM: {response}")
-        if isinstance(response, str):
-            result = json.loads(response)
-        elif hasattr(response, "content") and isinstance(response.content, str):
-            result = json.loads(response.content)
-        elif isinstance(response, dict):
-            result = response
-        else:
-            raise ValueError(f"Unexpected response type: {type(response)}")
+        # Use generate_sync and parse JSON response
+        response_str = llm.generate_sync(prompt)
+        logger.debug(f"Raw discount check response from LLM: {response_str}")
+        result = json.loads(response_str)
 
-        status = result.get("status", "error")
-        logger.info(f"Discount result: {result}")
+        discount_status = result.get("status", "error")
+        message_to_customer = result.get("message_to_customer")
 
-        updates = {"discount_status": status}
-        current_messages = state.get("messages", [])
-        new_message = None
-        requires_review_update = False
+        messages = state.get("messages", [])
+        # Start with the incoming review status
+        current_requires_review = state.get("requires_review", False)
 
-        if result.get("message_to_customer"):
-            new_message = {
+        if discount_status == "proof_needed" and message_to_customer:
+            logger.info("Discount requires proof, generating customer message.")
+            message = {
                 "role": "agent",
-                "content": result["message_to_customer"],
-                "type": "discount_query",  # Changed type? Or use proof_request?
+                "content": message_to_customer,
+                "type": "discount_query",
                 "requires_review": True,
             }
-            requires_review_update = True
-        # We removed the explicit 'proof_needed' message generation from here,
-        # as the prompt now asks the LLM to generate the message directly if needed.
-        # elif status == "proof_needed": ... (removed)
+            messages.append(message)
+            # Set review flag to True if asking customer
+            current_requires_review = True
+        elif discount_status == "no_proof_needed":
+             logger.info("No discount proof needed based on check.")
+             # Keep requires_review as it was
+        elif discount_status == "no_discount_applicable":
+             logger.info("No applicable discounts identified.")
+             # Keep requires_review as it was
+        else: # Includes error case from LLM
+             logger.warning(f"Discount check resulted in status: {discount_status}. Flagging for review.")
+             # Set review flag to True on error/unexpected status
+             current_requires_review = True
 
-        if new_message:
-            updates["messages"] = current_messages + [new_message]
-            updates["requires_review"] = requires_review_update
-        else:
-            updates["messages"] = current_messages
-            updates["requires_review"] = state.get("requires_review", False)
-
-        return updates
-    except Exception as e:
-        logger.error(f"Error checking for discounts: {e}", exc_info=True)
-        # Preserve state on error
+        # Return fields, ALWAYS including the final requires_review value
         return {
-            "discount_status": "error",
-            "messages": state.get("messages", []),
-            "requires_review": state.get("requires_review", False),
+            "messages": messages,
+            "discount_status": discount_status,
+            "requires_review": current_requires_review, # Ensure it's always returned
         }
+    except (json.JSONDecodeError, ValueError, Exception) as e:
+        logger.error(f"Error checking discounts: {e}", exc_info=True)
+        # Ensure requires_review is True on error
+        return {"discount_status": "error", "requires_review": True}
 
 
 def generate_quote(state: AgentState, llm: BaseLLMProvider) -> Dict[str, Any]:
-    """Node to generate a mock quote and review summary using full context."""
-    logger.info("Generating quote...")
-    mock_quote = {
-        "premium": 1234.56,
-        "coverage_details": "Standard PPA Coverage",
-        "term": "6 months",
-        "based_on": state.get("customer_info") or {},
-        "discount_applied": state.get("proof_of_discount", False),
+    """Node to generate a PPA quote (placeholder implementation)."""
+    logger.info("Generating quote (placeholder)...")
+
+    # Placeholder logic: Create dummy quote data based on available info
+    # In a real scenario, this would involve complex calculations or API calls.
+    customer_info = state.get("customer_info", {})
+    timestamp = datetime.now().isoformat() # Add timestamp
+
+    # Basic structure for a dummy quote
+    quote_data = {
+        "policy_number": f"PPA-{hash(json.dumps(customer_info, sort_keys=True)) % 100000}",
+        "premium_annual": 1200.50 + (hash(customer_info.get('driver_age', '')) % 100), # Vary premium slightly
+        "coverage_details": {
+            "bodily_injury": "100k/300k",
+            "property_damage": "50k",
+            "deductible_collision": 500,
+            "deductible_comprehensive": 250,
+        },
+        "vehicle": f"{customer_info.get('vehicle_year', 'N/A')} {customer_info.get('vehicle_make', 'N/A')} {customer_info.get('vehicle_model', 'N/A')}",
+        "driver": f"{customer_info.get('driver_name', 'N/A')} (Age: {customer_info.get('driver_age', 'N/A')})",
+        "quote_timestamp": timestamp,
     }
-    thread_formatted = format_email_thread(state["email_thread"])
-    customer_info_json = json.dumps(state.get("customer_info") or {})
-    missing_info_json = json.dumps(state.get("missing_info") or [])
-    messages_json = json.dumps(state.get("messages") or [])  # Internal agent messages
-    quote_data_json = json.dumps(mock_quote)
 
-    prompt = PREPARE_REVIEW_PROMPT.format(
-        email_thread_formatted=thread_formatted,
-        customer_info=customer_info_json,
-        missing_info=missing_info_json,
-        messages=messages_json,
-        quote_data=quote_data_json,
-    )
+    logger.info(f"Generated placeholder quote data: {quote_data}")
 
-    try:
-        response_content = llm.generate_sync(prompt)
-        if hasattr(response_content, "content"):
-            response_content = response_content.content
-
-        logger.debug(f"Generated quote summary content: {response_content}")
-        current_messages = state.get("messages", [])
-        updates = {
-            "quote_data": mock_quote,
-            "quote_ready": True,
-            "messages": current_messages
-            + [
-                {
-                    "role": "agent",
-                    "content": response_content,
-                    "type": "quote_summary_for_review",
-                    "requires_review": True,
-                }
-            ],
-            "requires_review": True,
-            "status": "quote_generated",
-        }
-        logger.info("Quote result: {'status': 'quote_generated'}")
-        return updates
-
-    except Exception as e:
-        logger.error(f"Error generating quote: {e}", exc_info=True)
-        # Preserve state on error
-        return {
-            "status": "error",
-            "messages": state.get("messages", []),
-            "requires_review": state.get("requires_review", False),
-        }
+    # Return the state update
+    # This node successfully generated a quote (even if dummy)
+    return {
+        "quote_data": quote_data,
+        "quote_ready": True,
+        "status": "quote_generated",
+        "messages": state.get("messages", []) # Preserve existing messages
+    }
 
 
 def prepare_agency_review(state: AgentState, llm: BaseLLMProvider) -> Dict[str, Any]:
     """Node to finalize state for agency review."""
     logger.info("Preparing agency review...")
-    # This node's logic might simplify now, as prompts generate summaries earlier.
-    # Its main role is ensuring the review flag is set correctly before ending (for now).
+
+    # Preserve quote_ready state if it was set previously
+    quote_ready_status = state.get("quote_ready", False)
+    logger.debug(f"[prepare_agency_review] Incoming quote_ready value: {quote_ready_status} (Type: {type(quote_ready_status)})")
 
     if state.get("requires_review"):
         logger.info("State already marked for review.")
@@ -458,7 +415,8 @@ def prepare_agency_review(state: AgentState, llm: BaseLLMProvider) -> Dict[str, 
         status = "ready_for_review"
         if last_message_type == "error":
             status = "error"
-        return {"status": status}
+        # Include quote_ready in return
+        return {"status": status, "quote_ready": quote_ready_status}
     else:
         # This path shouldn't ideally be taken if previous nodes correctly set the flag
         logger.warning(
@@ -467,7 +425,8 @@ def prepare_agency_review(state: AgentState, llm: BaseLLMProvider) -> Dict[str, 
         # Use the status set by the previous node (e.g., 'quote_generated', 'no_proof_needed') if available
         # Or default to ready_for_review if we somehow got here.
         status = state.get("status", "ready_for_review") or "ready_for_review"
-        return {"requires_review": True, "status": status}
+        # Include quote_ready in return
+        return {"requires_review": True, "status": status, "quote_ready": quote_ready_status}
 
 
 def process_customer_response(state: AgentState, llm: BaseLLMProvider) -> Dict[str, Any]:
@@ -492,16 +451,10 @@ def process_customer_response(state: AgentState, llm: BaseLLMProvider) -> Dict[s
     )
 
     try:
-        response = llm.generate_sync(prompt)
-        logger.debug(f"Raw response processing result from LLM: {response}")
-        if isinstance(response, str):
-            result = json.loads(response)
-        elif hasattr(response, "content") and isinstance(response.content, str):
-            result = json.loads(response.content)
-        elif isinstance(response, dict):
-            result = response
-        else:
-            raise ValueError(f"Unexpected response type: {type(response)}")
+        # Use generate_sync and parse JSON response
+        response_str = llm.generate_sync(prompt)
+        logger.debug(f"Raw response processing result from LLM: {response_str}")
+        result = json.loads(response_str)
 
         logger.info(f"Parsed customer response analysis: {result}")
 
@@ -556,7 +509,7 @@ def process_customer_response(state: AgentState, llm: BaseLLMProvider) -> Dict[s
         logger.info(f"State updates after processing response: {updates}")
         return updates
 
-    except Exception as e:
+    except (json.JSONDecodeError, ValueError, Exception) as e:
         logger.error(f"Error processing customer response: {e}", exc_info=True)
         # Preserve existing state but signal error
         return {

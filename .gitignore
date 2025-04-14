@@ -43,3 +43,6 @@ venv.bak/
 .env
 logs/
 *.log visualizations/
+
+# Test Outputs
+test_outputs/

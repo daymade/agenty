@@ -1,5 +1,5 @@
 ---
-description:
+description: 
 globs: *.py
 alwaysApply: false
 ---
@@ -8,3 +8,5 @@ alwaysApply: false
 - read [python.rule](mdc:.cursor/rules/python.rule)
 - we are using conda + poetry, do not use pip, use poetry add!
 - do not auto push the repo without confirmation.
+- do not add google-generativeai, it's [google_genai_migration.md](mdc:docs/google_genai_migration.md)!
+- do not use langchain!

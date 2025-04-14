@@ -12,11 +12,16 @@ from datetime import datetime
 from functools import partial
 from typing import Any, Dict, List, Optional, cast
 
-from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
 
 from . import config
-from .llm_providers import BaseLLMProvider, GeminiChatAdapter, GeminiConfig
+from .llm_providers import (
+    BaseLLMProvider,
+    GeminiConfig,
+    GeminiProvider,
+    LLMProvider,
+    OpenAIProvider,
+)
 from .nodes import (analyze_information, check_for_discounts,
                     generate_info_request, generate_quote, identify_intention,
                     identify_lob, prepare_agency_review,
@@ -39,24 +44,27 @@ class PPAAgent:
         self.conversation_threads: Dict[str, Dict[str, Any]] = {}
 
         if llm_provider:
-            self.llm = llm_provider
+            self.llm: BaseLLMProvider = llm_provider
         else:
             provider_type = provider.lower()
-            if provider_type == "gemini":
-                model_to_use = model or config.GEMINI_MODEL_NAME
+            if provider_type == LLMProvider.GEMINI.value:
                 gemini_config = GeminiConfig.from_env()
-                gemini_config.model = model_to_use
-                logger.info(f"Initializing GeminiChatAdapter with model: {model_to_use}")
-                self.llm = GeminiChatAdapter(
-                    api_key=gemini_config.api_key, model=gemini_config.model
+                model_to_use = model or gemini_config.model
+                logger.info(f"Initializing GeminiProvider with model: {model_to_use}")
+                self.llm = GeminiProvider(
+                    api_key=gemini_config.api_key,
+                    model=model_to_use
                 )
-            elif provider_type == "openai":
+            elif provider_type == LLMProvider.OPENAI.value:
                 api_key = os.getenv("OPENAI_API_KEY")
                 model_name = model or config.OPENAI_MODEL_NAME
                 if not api_key:
                     raise ValueError("OpenAI API key not found in environment variables.")
-                logger.info(f"Initializing OpenAI provider with model: {model_name}")
-                self.llm = ChatOpenAI(model=model_name, api_key=api_key)
+                logger.info(f"Initializing OpenAIProvider with model: {model_name}")
+                self.llm = OpenAIProvider(
+                    api_key=api_key,
+                    model=model_name
+                )
             else:
                 raise ValueError(f"Unsupported LLM provider type: {provider_type}")
 
@@ -139,7 +147,11 @@ class PPAAgent:
 
     def _decide_after_discount_check(self, state: AgentState) -> str:
         discount_status = state.get("discount_status", "error")
-        requires_review = state.get("requires_review", False)
+        requires_review = state.get("requires_review")
+        if requires_review is None:
+            requires_review = True
+            logger.warning("requires_review key missing in _decide_after_discount_check, defaulting to True")
+
         logger.info(
             f"Routing after discount check. Status: {discount_status}, Requires Review: {requires_review}"
         )
@@ -288,7 +300,7 @@ class PPAAgent:
             "quote_data": None,
             "proof_of_discount": None,
             "messages": [],
-            "requires_review": True,
+            "requires_review": False,
             "intent": None,
             "lob": None,
             "status": "new",
