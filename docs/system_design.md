@@ -189,3 +189,7 @@ For the PoC, this node will likely just simulate approval and proceed.
 *   **Scalability:** Evaluate performance and potential for handling concurrent requests.
 *   **Expand Scope:** Add support for other lines of business or more complex scenarios within PPA.
 *   **Security:** Ensure proper handling of Personally Identifiable Information (PII).
+
+# Refs
+1. https://cloud.google.com/vertex-ai/generative-ai/docs/agent-engine/use/langgraph
+2. https://langchain-ai.github.io/langgraph/tutorials/introduction/

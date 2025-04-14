@@ -1,0 +1,50 @@
+{
+  "thread_id": "45892f84bc8442c3b868c16080c6c4c4",
+  "customer_email": "\n        Hello, I'd like to get car insurance.\n        I'm Sarah Johnson and I drive a Honda.\n\n        Please let me know what information you need.\n\n        Thanks,\n        Sarah\n        ",
+  "email_thread": [
+    {
+      "role": "customer",
+      "content": "\n        Hello, I'd like to get car insurance.\n        I'm Sarah Johnson and I drive a Honda.\n\n        Please let me know what information you need.\n\n        Thanks,\n        Sarah\n        ",
+      "timestamp": "2025-04-15T03:10:52.406160"
+    }
+  ],
+  "customer_info": {
+    "driver_name": "Sarah Johnson",
+    "driver_age": null,
+    "vehicle_make": "Honda",
+    "vehicle_model": null,
+    "vehicle_year": null,
+    "address": null
+  },
+  "missing_info": [
+    "driver_age",
+    "vehicle_model",
+    "vehicle_year",
+    "address"
+  ],
+  "ppa_requirements": [
+    "driver_name",
+    "driver_age",
+    "vehicle_make",
+    "vehicle_model",
+    "vehicle_year",
+    "address"
+  ],
+  "quote_ready": false,
+  "quote_data": null,
+  "proof_of_discount": null,
+  "messages": [
+    {
+      "role": "agent",
+      "content": "{\"email_body\": \"Hello,\\n\\nTo continue preparing your auto insurance quote, could you please provide the following details?\\n\\n*   Your age (as the primary driver)\\n*   The vehicle model\\n*   The vehicle year\\n*   Your full residential address\\n\\nThis information will help ensure the quote is accurate. \\n\\nThank you!\"}",
+      "type": "info_request",
+      "requires_review": true
+    }
+  ],
+  "requires_review": true,
+  "intent": "new_business",
+  "lob": "PPA",
+  "status": "ready_for_review",
+  "discount_status": null,
+  "customer_question": null
+}

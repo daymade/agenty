@@ -1,0 +1,41 @@
+{
+  "customer_email": "\n        Hello, I'd like to get car insurance.\n        I'm Sarah Johnson and I drive a Honda.\n\n        Please let me know what information you need.\n\n        Thanks,\n        Sarah\n        ",
+  "customer_info": {
+    "driver_name": "Sarah Johnson",
+    "driver_age": null,
+    "vehicle_make": "Honda",
+    "vehicle_model": null,
+    "vehicle_year": null,
+    "address": null
+  },
+  "missing_info": [
+    "driver_age",
+    "vehicle_model",
+    "vehicle_year",
+    "address"
+  ],
+  "ppa_requirements": [
+    "driver_name",
+    "driver_age",
+    "vehicle_make",
+    "vehicle_model",
+    "vehicle_year",
+    "address"
+  ],
+  "quote_ready": false,
+  "quote_data": null,
+  "proof_of_discount": null,
+  "messages": [
+    {
+      "role": "agent",
+      "content": "{\"subject\": \"Information Needed for Your Insurance Quote\", \"body\": \"Dear [Customer Name],\\n\\nThank you for requesting an insurance quote.\\n\\nTo complete your request accurately, could you please provide the following missing details?\\n\\n*   Driver's Age\\n*   Vehicle Model\\n*   Vehicle Year\\n*   Full Address\\n\\nOnce we receive this information, we can finalize your quote promptly.\\n\\nThank you for your cooperation.\\n\\nBest regards,\\n\\n[Your Name/Insurance Agency Name]\"}",
+      "type": "info_request",
+      "requires_review": true
+    }
+  ],
+  "requires_review": true,
+  "intent": "new_business",
+  "lob": "PPA",
+  "status": "ready_for_review",
+  "discount_status": null
+}

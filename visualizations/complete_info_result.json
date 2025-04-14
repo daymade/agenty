@@ -1,0 +1,36 @@
+{
+  "customer_email": "\n        Hello, I need car insurance for my vehicle.\n        I'm John Smith, 35 years old, living at 123 Main St, Seattle, WA.\n\n        I drive a 2020 Toyota Camry. I've been driving for 15 years with no accidents.\n\n        Looking forward to your quote.\n        Best regards,\n        John\n        ",
+  "customer_info": {
+    "driver_name": "John Smith",
+    "driver_age": "35",
+    "vehicle_make": "Toyota",
+    "vehicle_model": "Camry",
+    "vehicle_year": "2020",
+    "address": "123 Main St, Seattle, WA"
+  },
+  "missing_info": [],
+  "ppa_requirements": [
+    "driver_name",
+    "driver_age",
+    "vehicle_make",
+    "vehicle_model",
+    "vehicle_year",
+    "address"
+  ],
+  "quote_ready": false,
+  "quote_data": null,
+  "proof_of_discount": null,
+  "messages": [
+    {
+      "role": "agent",
+      "content": "Based on your information, you might qualify for a Safe Driver discount. Do you have proof of a clean driving record, such as a recent motor vehicle report or documentation from a previous insurer?",
+      "type": "discount_query",
+      "requires_review": true
+    }
+  ],
+  "requires_review": true,
+  "intent": "new_business",
+  "lob": "PPA",
+  "status": "ready_for_review",
+  "discount_status": "proof_needed"
+}

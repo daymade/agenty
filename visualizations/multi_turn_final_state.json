@@ -1,0 +1,50 @@
+{
+  "thread_id": "b4c4775771564120b22d2ba4e221342f",
+  "customer_email": "\n    Subject: Re: Need a car insurance quote!\n    \n    Sorry about that, it's an Outback Wilderness model.\n    ",
+  "email_thread": [
+    {
+      "role": "customer",
+      "content": "\n        Subject: Need a car insurance quote!\n        \n        Hi there,\n        Please provide a quote for my 2022 Subaru. \n        My name is Alice Williams, age 40.\n        I live at 789 Pine St, Portland, OR.\n        Thanks!\n        ",
+      "timestamp": "2025-04-15T03:11:30.331100"
+    },
+    {
+      "role": "customer",
+      "content": "\n    Subject: Re: Need a car insurance quote!\n    \n    Sorry about that, it's an Outback Wilderness model.\n    ",
+      "timestamp": "2025-04-15T03:11:47.549721"
+    }
+  ],
+  "customer_info": {
+    "driver_name": "Alice Williams",
+    "driver_age": "40",
+    "vehicle_make": "Subaru",
+    "vehicle_model": "Outback Wilderness",
+    "vehicle_year": "2022",
+    "address": "789 Pine St, Portland, OR"
+  },
+  "missing_info": [],
+  "ppa_requirements": [
+    "driver_name",
+    "driver_age",
+    "vehicle_make",
+    "vehicle_model",
+    "vehicle_year",
+    "address"
+  ],
+  "quote_ready": false,
+  "quote_data": null,
+  "proof_of_discount": null,
+  "messages": [
+    {
+      "role": "agent",
+      "content": "To check for potential discounts like Safe Driver, could you tell us about your driving history (any accidents or violations in the last 5 years)?",
+      "type": "discount_query",
+      "requires_review": true
+    }
+  ],
+  "requires_review": true,
+  "intent": "provide_info",
+  "lob": null,
+  "status": "ready_for_review",
+  "discount_status": "proof_needed",
+  "customer_question": null
+}

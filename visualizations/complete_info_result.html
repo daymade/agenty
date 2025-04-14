@@ -1,0 +1,124 @@
+
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>PPA Agent Result: complete_info</title>
+        <meta charset="UTF-8">
+        <style>
+            body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; }
+            .container { display: flex; width: 95%; max-width: 1600px; margin-top: 20px; gap: 20px; }
+            /* Adjust layout: Make graph container wider */
+            .graph-container { flex: 3; overflow: auto; border: 1px solid #ccc; padding: 10px; background-color: #f9f9f9; }
+            .state-container { flex: 1; border: 1px solid #ccc; padding: 10px; background-color: #f0f0f0; max-height: 90vh; overflow-y: auto; }
+            h1, h2 { text-align: center; }
+            pre { white-space: pre-wrap; word-wrap: break-word; background-color: #fff; padding: 10px; border-radius: 5px; font-size: 12px; }
+            /* Style for the mermaid diagram container */
+            .mermaid { text-align: center; background-color: #f9f9f9; padding: 15px; border-radius: 5px; }
+            .error { color: red; font-weight: bold; }
+        </style>
+        <!-- Load Mermaid JS from CDN -->
+        <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    </head>
+    <body>
+        <h1>PPA Agent Result: complete_info</h1>
+        <div class="container">
+            <div class="graph-container">
+                <h2>Workflow Graph</h2>
+                <!-- Embed Mermaid definition -->
+                <pre class="mermaid">
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	identify_intention_node(identify_intention_node)
+	identify_lob_node(identify_lob_node)
+	analyze_information_node(analyze_information_node)
+	generate_info_request_node(generate_info_request_node)
+	check_discounts_node(check_discounts_node)
+	generate_quote_node(generate_quote_node)
+	prepare_agency_review_node(prepare_agency_review_node)
+	process_customer_response_node(process_customer_response_node)
+	error_node(error_node)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> identify_intention_node;
+	error_node --> __end__;
+	generate_info_request_node --> prepare_agency_review_node;
+	generate_quote_node --> prepare_agency_review_node;
+	identify_intention_node -.-> identify_lob_node;
+	identify_intention_node -.-> process_customer_response_node;
+	identify_intention_node -.-> error_node;
+	identify_intention_node -.-> __end__;
+	identify_lob_node -.-> analyze_information_node;
+	identify_lob_node -.-> error_node;
+	identify_lob_node -.-> __end__;
+	analyze_information_node -.-> check_discounts_node;
+	analyze_information_node -.-> generate_info_request_node;
+	analyze_information_node -.-> error_node;
+	analyze_information_node -.-> __end__;
+	check_discounts_node -.-> prepare_agency_review_node;
+	check_discounts_node -.-> generate_quote_node;
+	check_discounts_node -.-> error_node;
+	prepare_agency_review_node -.-> error_node;
+	prepare_agency_review_node -.-> __end__;
+	process_customer_response_node -.-> check_discounts_node;
+	process_customer_response_node -.-> generate_info_request_node;
+	process_customer_response_node -.-> analyze_information_node;
+	process_customer_response_node -.-> error_node;
+	process_customer_response_node -.-> __end__;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc
+
+                </pre>
+            </div>
+            <div class="state-container">
+                <h2>Final State</h2>
+                <pre>{
+  "thread_id": "0c9125aa6c4e4be6ac8ac2c6689e17dc",
+  "customer_email": "\n        Hello, I need car insurance for my vehicle.\n        I'm John Smith, 35 years old, living at 123 Main St, Seattle, WA.\n\n        I drive a 2020 Toyota Camry. I've been driving for 15 years with no accidents.\n\n        Looking forward to your quote.\n        Best regards,\n        John\n        ",
+  "email_thread": [
+    {
+      "role": "customer",
+      "content": "\n        Hello, I need car insurance for my vehicle.\n        I'm John Smith, 35 years old, living at 123 Main St, Seattle, WA.\n\n        I drive a 2020 Toyota Camry. I've been driving for 15 years with no accidents.\n\n        Looking forward to your quote.\n        Best regards,\n        John\n        ",
+      "timestamp": "2025-04-15T03:10:33.173028"
+    }
+  ],
+  "customer_info": {
+    "driver_name": "John Smith",
+    "driver_age": "35",
+    "vehicle_make": "Toyota",
+    "vehicle_model": "Camry",
+    "vehicle_year": "2020",
+    "address": "123 Main St, Seattle, WA"
+  },
+  "missing_info": [],
+  "ppa_requirements": [
+    "driver_name",
+    "driver_age",
+    "vehicle_make",
+    "vehicle_model",
+    "vehicle_year",
+    "address"
+  ],
+  "quote_ready": false,
+  "quote_data": null,
+  "proof_of_discount": null,
+  "messages": [],
+  "requires_review": true,
+  "intent": "new_business",
+  "lob": "PPA",
+  "status": "ready_for_review",
+  "discount_status": "no_proof_needed",
+  "customer_question": null
+}</pre>
+            </div>
+        </div>
+        <!-- Initialize Mermaid -->
+        <script>
+            mermaid.initialize({ startOnLoad: true });
+        </script>
+    </body>
+    </html>

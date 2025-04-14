@@ -7,10 +7,11 @@ from abc import ABC, abstractmethod
 from typing import Any, List, Optional
 
 import google.genai as genai
+from langchain_core.callbacks.manager import CallbackManagerForLLMRun
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
-from pydantic import BaseModel, Field, PrivateAttr
+from pydantic import BaseModel, Field, PrivateAttr, confloat
 
 logger = logging.getLogger(__name__)
 
@@ -29,17 +30,16 @@ class BaseLLMProvider(ABC):
         pass
 
 
-class GeminiProvider(BaseLLMProvider):
+class GeminiProvider(BaseLLMProvider, BaseModel):
     """Provider for Google Gemini models using google-genai SDK."""
 
-    api_key: str
-    model: str
+    api_key: str = Field(description="The API key to use")
+    model: str = Field(default="gemini-2.5-pro-exp-03-25", description="The model to use")
     _client: genai.Client = PrivateAttr()
 
     def __init__(self, api_key: str, model: str = "gemini-2.5-pro-exp-03-25") -> None:
         """Initialize the Gemini provider using the Google Gemini SDK."""
-        self.api_key = api_key
-        self.model = model
+        super().__init__(api_key=api_key, model=model)
         # Initialize the client using the API key
         # The SDK will automatically pick up GOOGLE_API_KEY if api_key is None/empty
         self._client = genai.Client(api_key=self.api_key if self.api_key else None)
@@ -48,12 +48,12 @@ class GeminiProvider(BaseLLMProvider):
         """Generate text from prompt synchronously using the Gemini SDK."""
         try:
             # Use client.models.generate_content
-            response = self._client.models.generate_content(
+            response: genai.types.GenerateContentResponse = self._client.models.generate_content(
                 model=self.model,
                 contents=prompt,
                 # No config parameter needed for basic usage
             )
-            return response.text
+            return str(response.text)
         except genai.errors.APIError as e:
             # Check if this is a safety error (blocked prompt)
             if "blocked" in str(e).lower() or "safety" in str(e).lower():
@@ -73,12 +73,14 @@ class GeminiProvider(BaseLLMProvider):
         """Generate text from prompt asynchronously."""
         # Using the async method from the Gemini SDK
         try:
-            response = await self._client.models.generate_content_async(
-                model=self.model,
-                contents=prompt,
-                # No config parameter needed for basic usage
+            response: genai.types.GenerateContentResponse = (
+                await self._client.models.generate_content_async(
+                    model=self.model,
+                    contents=prompt,
+                    # No config parameter needed for basic usage
+                )
             )
-            return response.text
+            return str(response.text)
         except genai.errors.APIError as e:
             # Check if this is a safety error (blocked prompt)
             if "blocked" in str(e).lower() or "safety" in str(e).lower():
@@ -96,7 +98,9 @@ class GeminiChatAdapter(BaseChatModel):
     """Adapter to make Gemini provider compatible with LangChain's chat interface."""
 
     model: str = Field(default="gemini-2.5-pro-exp-03-25", description="The model to use")
-    temperature: float = Field(default=0.7, description="Sampling temperature")
+    temperature: confloat(ge=0.0, le=1.0) = Field(
+        default=0.7, description="Sampling temperature between 0 and 1"
+    )
     _client: genai.Client = PrivateAttr()
 
     def __init__(
@@ -116,7 +120,7 @@ class GeminiChatAdapter(BaseChatModel):
         self,
         messages: List[BaseMessage],
         stop: Optional[List[str]] = None,
-        run_manager: Optional[Any] = None,
+        run_manager: Optional[CallbackManagerForLLMRun] = None,
         **kwargs: Any,
     ) -> ChatResult:
         """Generate completions for the given messages using google-genai."""
@@ -125,7 +129,7 @@ class GeminiChatAdapter(BaseChatModel):
         prompt = "\n".join(f"{type(msg).__name__}: {msg.content}" for msg in messages)
 
         # Create the config parameter with direct temperature and responseMimeType fields
-        config = genai.types.GenerateContentConfig(
+        config: genai.types.GenerateContentConfig = genai.types.GenerateContentConfig(
             temperature=self.temperature,
             responseMimeType="application/json",
         )
