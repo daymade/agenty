@@ -2,30 +2,192 @@
     <!DOCTYPE html>
     <html>
     <head>
-        <title>PPA Agent Result: missing_info</title>
+        <title>PPA Agent Result - Complete Info</title>
         <meta charset="UTF-8">
         <style>
-            body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; }
-            .container { display: flex; width: 95%; max-width: 1600px; margin-top: 20px; gap: 20px; }
-            /* Adjust layout: Make graph container wider */
-            .graph-container { flex: 3; overflow: auto; border: 1px solid #ccc; padding: 10px; background-color: #f9f9f9; }
-            .state-container { flex: 1; border: 1px solid #ccc; padding: 10px; background-color: #f0f0f0; max-height: 90vh; overflow-y: auto; }
-            h1, h2 { text-align: center; }
-            pre { white-space: pre-wrap; word-wrap: break-word; background-color: #fff; padding: 10px; border-radius: 5px; font-size: 12px; }
-            /* Style for the mermaid diagram container */
-            .mermaid { text-align: center; background-color: #f9f9f9; padding: 15px; border-radius: 5px; }
-            .error { color: red; font-weight: bold; }
+            body {
+                font-family: system-ui, -apple-system, sans-serif;
+                margin: 0;
+                padding: 20px;
+                background-color: #f5f5f5;
+            }
+            .main-container {
+                max-width: 1800px;
+                margin: 0 auto;
+                background: white;
+                padding: 20px;
+                border-radius: 8px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .section {
+                margin-bottom: 30px;
+                padding: 20px;
+                background: #fff;
+                border-radius: 8px;
+                border: 1px solid #e0e0e0;
+            }
+            .flex-container {
+                display: flex;
+                gap: 20px;
+                margin-top: 20px;
+            }
+            .graph-container {
+                flex: 2;
+                min-width: 0;
+            }
+            .details-container {
+                flex: 1;
+                min-width: 0;
+            }
+            h1, h2, h3 {
+                color: #2c3e50;
+                margin-top: 0;
+            }
+            .message {
+                background: #f8f9fa;
+                padding: 15px;
+                margin: 10px 0;
+                border-radius: 4px;
+                border-left: 4px solid #007bff;
+            }
+            .message.requires-review {
+                border-left-color: #ffc107;
+            }
+            pre {
+                background: #f8f9fa;
+                padding: 15px;
+                border-radius: 4px;
+                overflow-x: auto;
+                font-size: 13px;
+                line-height: 1.5;
+            }
+            .customer-info {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                gap: 10px;
+                margin: 10px 0;
+            }
+            .info-item {
+                background: #f8f9fa;
+                padding: 10px;
+                border-radius: 4px;
+            }
+            .info-label {
+                font-weight: bold;
+                color: #666;
+            }
+            .mermaid {
+                background: white;
+                padding: 20px;
+                border-radius: 4px;
+            }
+            .missing-info {
+                color: #dc3545;
+                font-style: italic;
+            }
+            .badge {
+                display: inline-block;
+                padding: 3px 8px;
+                border-radius: 12px;
+                font-size: 12px;
+                font-weight: 500;
+                margin-left: 8px;
+            }
+            .badge.review {
+                background-color: #fff3cd;
+                color: #856404;
+            }
+            .badge.type {
+                background-color: #e2e3e5;
+                color: #383d41;
+            }
         </style>
-        <!-- Load Mermaid JS from CDN -->
         <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
     </head>
     <body>
-        <h1>PPA Agent Result: missing_info</h1>
-        <div class="container">
-            <div class="graph-container">
-                <h2>Workflow Graph</h2>
-                <!-- Embed Mermaid definition -->
-                <pre class="mermaid">
+        <div class="main-container">
+            <h1>PPA Agent Result - Complete Info</h1>
+            
+            <div class="section">
+                <h2>Input Email</h2>
+                <pre>
+        Hello, I'd like to get car insurance.
+        I'm Sarah Johnson and I drive a Honda.
+
+        Please let me know what information you need.
+
+        Thanks,
+        Sarah
+        </pre>
+            </div>
+
+            <div class="section">
+                <h2>Extracted Customer Information</h2>
+                <div class="customer-info">
+                    
+                <div class="info-item">
+                    <div class="info-label">Driver Name</div>
+                    <div class="info-value">Sarah Johnson</div>
+                </div>
+            
+
+                <div class="info-item">
+                    <div class="info-label">Vehicle Make</div>
+                    <div class="info-value">Honda</div>
+                </div>
+            
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>Missing Information</h2>
+                <ul>
+<li class="missing-info">driver_age</li>
+<li class="missing-info">vehicle_model</li>
+<li class="missing-info">vehicle_year</li>
+<li class="missing-info">address</li>
+</ul>
+            </div>
+
+            <div class="section">
+                <h2>Generated Messages (2)</h2>
+                
+            <div class="messagerequires-review">
+                <div style="margin-bottom: 8px">
+                    <strong>agent</strong>
+                    <span class="badge type">info_request</span>
+                    <span class="badge review">requires review</span>
+                </div>
+                <pre style="margin: 0">To continue with your auto insurance quote request and ensure its accuracy, could you please provide the following information:
+
+*   Driver's age
+*   Vehicle model
+*   Vehicle year
+*   Your full address</pre>
+            </div>
+        
+
+            <div class="messagerequires-review">
+                <div style="margin-bottom: 8px">
+                    <strong>agent</strong>
+                    <span class="badge type">quote_summary_for_review</span>
+                    <span class="badge review">requires review</span>
+                </div>
+                <pre style="margin: 0">**PPA Quote Case Summary - Sarah Johnson**
+
+**Customer:** Sarah Johnson initiated a request for a Personal Auto Policy (PPA) quote.
+**Vehicle:** Provided make is Honda.
+**Quote Status:** No quote generated yet due to insufficient information.
+**Missing Information:** Critical details required include driver's age, specific Honda model, vehicle year, and the customer's full address.
+**Flags/Follow-up:** Initial contact lacks essential underwriting information. An automated request for the missing details (age, model, year, address) has been generated and requires review before sending to the customer. Further interaction is needed to gather necessary data for quote generation.</pre>
+            </div>
+        
+            </div>
+
+            <div class="flex-container">
+                <div class="graph-container section">
+                    <h2>Workflow Graph</h2>
+                    <pre class="mermaid">
 ---
 config:
   flowchart:
@@ -72,18 +234,19 @@ graph TD;
 	classDef first fill-opacity:0
 	classDef last fill:#bfb6fc
 
-                </pre>
-            </div>
-            <div class="state-container">
-                <h2>Final State</h2>
-                <pre>{
-  "thread_id": "45892f84bc8442c3b868c16080c6c4c4",
+                    </pre>
+                </div>
+                
+                <div class="details-container section">
+                    <h2>Complete State</h2>
+                    <pre>{
+  "thread_id": "a53992e07aa0478c9a823e1936b2ed55",
   "customer_email": "\n        Hello, I'd like to get car insurance.\n        I'm Sarah Johnson and I drive a Honda.\n\n        Please let me know what information you need.\n\n        Thanks,\n        Sarah\n        ",
   "email_thread": [
     {
       "role": "customer",
       "content": "\n        Hello, I'd like to get car insurance.\n        I'm Sarah Johnson and I drive a Honda.\n\n        Please let me know what information you need.\n\n        Thanks,\n        Sarah\n        ",
-      "timestamp": "2025-04-15T03:10:52.406160"
+      "timestamp": "2025-04-15T04:58:34.485329"
     }
   ],
   "customer_info": {
@@ -114,8 +277,14 @@ graph TD;
   "messages": [
     {
       "role": "agent",
-      "content": "{\"email_body\": \"Hello,\\n\\nTo continue preparing your auto insurance quote, could you please provide the following details?\\n\\n*   Your age (as the primary driver)\\n*   The vehicle model\\n*   The vehicle year\\n*   Your full residential address\\n\\nThis information will help ensure the quote is accurate. \\n\\nThank you!\"}",
+      "content": "To continue with your auto insurance quote request and ensure its accuracy, could you please provide the following information:\n\n*   Driver's age\n*   Vehicle model\n*   Vehicle year\n*   Your full address",
       "type": "info_request",
+      "requires_review": true
+    },
+    {
+      "role": "agent",
+      "content": "**PPA Quote Case Summary - Sarah Johnson**\n\n**Customer:** Sarah Johnson initiated a request for a Personal Auto Policy (PPA) quote.\n**Vehicle:** Provided make is Honda.\n**Quote Status:** No quote generated yet due to insufficient information.\n**Missing Information:** Critical details required include driver's age, specific Honda model, vehicle year, and the customer's full address.\n**Flags/Follow-up:** Initial contact lacks essential underwriting information. An automated request for the missing details (age, model, year, address) has been generated and requires review before sending to the customer. Further interaction is needed to gather necessary data for quote generation.",
+      "type": "quote_summary_for_review",
       "requires_review": true
     }
   ],
@@ -126,11 +295,12 @@ graph TD;
   "discount_status": null,
   "customer_question": null
 }</pre>
+                </div>
             </div>
         </div>
-        <!-- Initialize Mermaid -->
         <script>
             mermaid.initialize({ startOnLoad: true });
         </script>
     </body>
     </html>
+    

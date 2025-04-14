@@ -1,11 +1,11 @@
 {
-  "thread_id": "45892f84bc8442c3b868c16080c6c4c4",
+  "thread_id": "a53992e07aa0478c9a823e1936b2ed55",
   "customer_email": "\n        Hello, I'd like to get car insurance.\n        I'm Sarah Johnson and I drive a Honda.\n\n        Please let me know what information you need.\n\n        Thanks,\n        Sarah\n        ",
   "email_thread": [
     {
       "role": "customer",
       "content": "\n        Hello, I'd like to get car insurance.\n        I'm Sarah Johnson and I drive a Honda.\n\n        Please let me know what information you need.\n\n        Thanks,\n        Sarah\n        ",
-      "timestamp": "2025-04-15T03:10:52.406160"
+      "timestamp": "2025-04-15T04:58:34.485329"
     }
   ],
   "customer_info": {
@@ -36,8 +36,14 @@
   "messages": [
     {
       "role": "agent",
-      "content": "{\"email_body\": \"Hello,\\n\\nTo continue preparing your auto insurance quote, could you please provide the following details?\\n\\n*   Your age (as the primary driver)\\n*   The vehicle model\\n*   The vehicle year\\n*   Your full residential address\\n\\nThis information will help ensure the quote is accurate. \\n\\nThank you!\"}",
+      "content": "To continue with your auto insurance quote request and ensure its accuracy, could you please provide the following information:\n\n*   Driver's age\n*   Vehicle model\n*   Vehicle year\n*   Your full address",
       "type": "info_request",
+      "requires_review": true
+    },
+    {
+      "role": "agent",
+      "content": "**PPA Quote Case Summary - Sarah Johnson**\n\n**Customer:** Sarah Johnson initiated a request for a Personal Auto Policy (PPA) quote.\n**Vehicle:** Provided make is Honda.\n**Quote Status:** No quote generated yet due to insufficient information.\n**Missing Information:** Critical details required include driver's age, specific Honda model, vehicle year, and the customer's full address.\n**Flags/Follow-up:** Initial contact lacks essential underwriting information. An automated request for the missing details (age, model, year, address) has been generated and requires review before sending to the customer. Further interaction is needed to gather necessary data for quote generation.",
+      "type": "quote_summary_for_review",
       "requires_review": true
     }
   ],

@@ -1,16 +1,16 @@
 {
-  "thread_id": "b4c4775771564120b22d2ba4e221342f",
-  "customer_email": "\n    Subject: Re: Need a car insurance quote!\n    \n    Sorry about that, it's an Outback Wilderness model.\n    ",
+  "thread_id": "164c9a0140804e04afa7f7e580f2c075",
+  "customer_email": "\n    Subject: Re: Need a car insurance quote!\n\n    Sorry about that, it's an Outback Wilderness model.\n    ",
   "email_thread": [
     {
       "role": "customer",
-      "content": "\n        Subject: Need a car insurance quote!\n        \n        Hi there,\n        Please provide a quote for my 2022 Subaru. \n        My name is Alice Williams, age 40.\n        I live at 789 Pine St, Portland, OR.\n        Thanks!\n        ",
-      "timestamp": "2025-04-15T03:11:30.331100"
+      "content": "\n        Subject: Need a car insurance quote!\n\n        Hi there,\n        Please provide a quote for my 2022 Subaru.\n        My name is Alice Williams, age 40.\n        I live at 789 Pine St, Portland, OR.\n        Thanks!\n        ",
+      "timestamp": "2025-04-15T04:59:10.157902"
     },
     {
       "role": "customer",
-      "content": "\n    Subject: Re: Need a car insurance quote!\n    \n    Sorry about that, it's an Outback Wilderness model.\n    ",
-      "timestamp": "2025-04-15T03:11:47.549721"
+      "content": "\n    Subject: Re: Need a car insurance quote!\n\n    Sorry about that, it's an Outback Wilderness model.\n    ",
+      "timestamp": "2025-04-15T04:59:31.911788"
     }
   ],
   "customer_info": {
@@ -36,8 +36,14 @@
   "messages": [
     {
       "role": "agent",
-      "content": "To check for potential discounts like Safe Driver, could you tell us about your driving history (any accidents or violations in the last 5 years)?",
+      "content": "To check for a potential Safe Driver discount, could you let us know if you've had any accidents or moving violations in the past 3-5 years?",
       "type": "discount_query",
+      "requires_review": true
+    },
+    {
+      "role": "agent",
+      "content": "Internal Review Summary: PPA Quote - Alice Williams\nCustomer: Alice Williams, age 40, residing at 789 Pine St, Portland, OR.\nVehicle: 2022 Subaru Outback Wilderness.\nStatus: Initial customer and vehicle information successfully extracted. Quote data has not yet been generated.\nMissing Information: Driving history (accidents/violations in the past 3-5 years) needed to determine Safe Driver discount eligibility.\nFlags/Follow-up: An internal message was generated prompting for driving history. Agent needs to send this query to the customer to gather missing details required for accurate quote calculation and discount application.",
+      "type": "quote_summary_for_review",
       "requires_review": true
     }
   ],

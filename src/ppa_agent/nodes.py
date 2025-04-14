@@ -179,18 +179,16 @@ def identify_intention(state: AgentState, llm: BaseLLMProvider) -> Dict[str, str
     prompt = IDENTIFY_INTENTION_PROMPT.format(email_thread_formatted=thread_formatted)
 
     try:
-        # Use generate_sync and parse JSON response
-        response_str = llm.generate_sync(prompt)
+        # Use generate_sync with structured=True for JSON output
+        response_str = llm.generate_sync(prompt, structured=True)
         logger.debug(f"Raw intention response from LLM: {response_str}")
         result = json.loads(response_str)
 
         intent = result.get("intent", "other")
         logger.info(f"Intention result: {{'intent': '{intent}'}}")
-        # Return only the fields relevant to AgentState update
         return {"intent": intent}
     except (json.JSONDecodeError, ValueError, Exception) as e:
         logger.error(f"Error identifying intention: {e}", exc_info=True)
-        # Return error state to allow graph to route to error node
         return {"intent": "error"}
 
 
@@ -201,12 +199,12 @@ def identify_lob(state: AgentState, llm: BaseLLMProvider) -> Dict[str, str]:
     prompt = IDENTIFY_LOB_PROMPT.format(email_thread_formatted=thread_formatted)
 
     try:
-        # Use generate_sync and parse JSON response
-        response_str = llm.generate_sync(prompt)
+        # Use generate_sync with structured=True for JSON output
+        response_str = llm.generate_sync(prompt, structured=True)
         logger.debug(f"Raw LOB response from LLM: {response_str}")
         result = json.loads(response_str)
 
-        lob = result.get("lob", "UNKNOWN")  # Default to UNKNOWN if unsure
+        lob = result.get("lob", "UNKNOWN")
         logger.info(f"LOB result: {{'lob': '{lob}'}}")
         return {"lob": lob}
     except (json.JSONDecodeError, ValueError, Exception) as e:
@@ -217,7 +215,6 @@ def identify_lob(state: AgentState, llm: BaseLLMProvider) -> Dict[str, str]:
 def analyze_information(state: AgentState, llm: BaseLLMProvider) -> Dict[str, Any]:
     """Node to analyze customer information from the *entire thread*."""
     logger.info("Analyzing information...")
-    # Use requirements from config
     requirements_json = json.dumps(config.PPA_REQUIREMENTS, indent=2)
     thread_formatted = format_email_thread(state["email_thread"])
 
@@ -226,8 +223,8 @@ def analyze_information(state: AgentState, llm: BaseLLMProvider) -> Dict[str, An
     )
 
     try:
-        # Use generate_sync and parse JSON response
-        response_str = llm.generate_sync(prompt)
+        # Use generate_sync with structured=True for JSON output
+        response_str = llm.generate_sync(prompt, structured=True)
         logger.debug(f"Raw analysis response from LLM: {response_str}")
         result = json.loads(response_str)
 
@@ -271,16 +268,14 @@ def analyze_information(state: AgentState, llm: BaseLLMProvider) -> Dict[str, An
 def generate_info_request(state: AgentState, llm: BaseLLMProvider) -> Dict[str, Any]:
     """Node to generate an email requesting missing information."""
     logger.info("Generating information request...")
-    # Use the current 'missing_info' list from the state
     missing_info_str = ", ".join(state["missing_info"])
     prompt = GENERATE_INFO_REQUEST_PROMPT.format(missing_info=missing_info_str)
 
     try:
-        # Use generate_sync, response is plain text
-        response_text = llm.generate_sync(prompt)
+        # Use generate_sync with structured=False for plain text
+        response_text = llm.generate_sync(prompt, structured=False)
         logger.debug(f"Raw info request response from LLM: {response_text}")
 
-        # Create the message object for the state
         message = {
             "role": "agent",
             "content": response_text,
@@ -310,7 +305,6 @@ def check_for_discounts(state: AgentState, llm: BaseLLMProvider) -> Dict[str, An
     """Node to check for potential discounts based on history and info."""
     logger.info("Checking for discounts...")
     thread_formatted = format_email_thread(state["email_thread"])
-    # Ensure customer_info is a dict for json.dumps, even if it came back as None from analyze
     customer_info_json = json.dumps(state.get("customer_info") or {})
 
     prompt = CHECK_DISCOUNTS_PROMPT.format(
@@ -318,8 +312,8 @@ def check_for_discounts(state: AgentState, llm: BaseLLMProvider) -> Dict[str, An
     )
 
     try:
-        # Use generate_sync and parse JSON response
-        response_str = llm.generate_sync(prompt)
+        # Use generate_sync with structured=True for JSON output
+        response_str = llm.generate_sync(prompt, structured=True)
         logger.debug(f"Raw discount check response from LLM: {response_str}")
         result = json.loads(response_str)
 
@@ -403,42 +397,53 @@ def generate_quote(state: AgentState, llm: BaseLLMProvider) -> Dict[str, Any]:
 def prepare_agency_review(state: AgentState, llm: BaseLLMProvider) -> Dict[str, Any]:
     """Node to finalize state for agency review."""
     logger.info("Preparing agency review...")
+    thread_formatted = format_email_thread(state["email_thread"])
+    customer_info_json = json.dumps(state.get("customer_info") or {})
+    missing_info_json = json.dumps(state.get("missing_info") or [])
+    quote_data_json = json.dumps(state.get("quote_data") or {})
+    messages_json = json.dumps(state.get("messages") or [])
 
-    # Preserve quote_ready state if it was set previously
-    quote_ready_status = state.get("quote_ready", False)
-    logger.debug(f"[prepare_agency_review] Incoming quote_ready value: {quote_ready_status} (Type: {type(quote_ready_status)})")
+    prompt = PREPARE_REVIEW_PROMPT.format(
+        email_thread_formatted=thread_formatted,
+        customer_info=customer_info_json,
+        missing_info=missing_info_json,
+        quote_data=quote_data_json,
+        messages=messages_json,
+    )
 
-    if state.get("requires_review"):
-        logger.info("State already marked for review.")
-        # Determine final status based on the message that triggered review
-        last_message_type = state["messages"][-1]["type"] if state.get("messages") else "unknown"
-        status = "ready_for_review"
-        if last_message_type == "error":
-            status = "error"
-        # Include quote_ready in return
-        return {"status": status, "quote_ready": quote_ready_status}
-    else:
-        # This path shouldn't ideally be taken if previous nodes correctly set the flag
-        logger.warning(
-            "prepare_agency_review reached but requires_review is False. Setting status based on previous node."
-        )
-        # Use the status set by the previous node (e.g., 'quote_generated', 'no_proof_needed') if available
-        # Or default to ready_for_review if we somehow got here.
-        status = state.get("status", "ready_for_review") or "ready_for_review"
-        # Include quote_ready in return
-        return {"requires_review": True, "status": status, "quote_ready": quote_ready_status}
+    try:
+        # Use generate_sync with structured=False for plain text
+        response_text = llm.generate_sync(prompt, structured=False)
+        logger.debug(f"Raw review response from LLM: {response_text}")
+
+        message = {
+            "role": "agent",
+            "content": response_text,
+            "type": "quote_summary_for_review",
+            "requires_review": True,
+        }
+        current_messages = state.get("messages", [])
+        return {
+            "messages": current_messages + [message],
+            "requires_review": True,
+            "status": "ready_for_review"  # Set the status correctly
+        }
+    except (ValueError, Exception) as e:
+        logger.error(f"Error preparing agency review: {e}", exc_info=True)
+        # Ensure status reflects the error
+        return {
+            "status": "error_preparing_review", 
+            "requires_review": False  # Review not possible if error occurred here
+        }
 
 
 def process_customer_response(state: AgentState, llm: BaseLLMProvider) -> Dict[str, Any]:
     """Processes the latest customer email reply in the context of the thread."""
     logger.info("Processing customer response...")
     thread_formatted = format_email_thread(state["email_thread"])
-    # Use requirements from config
     requirements_json = json.dumps(config.PPA_REQUIREMENTS, indent=2)
 
-    # Find the last agent message to provide context
     last_agent_message = "No previous agent message found."
-    # Iterate backwards through the thread history copy
     for msg in reversed(state.get("email_thread", [])):
         if msg.get("role") == "agent":
             last_agent_message = msg.get("content", "")
@@ -451,8 +456,8 @@ def process_customer_response(state: AgentState, llm: BaseLLMProvider) -> Dict[s
     )
 
     try:
-        # Use generate_sync and parse JSON response
-        response_str = llm.generate_sync(prompt)
+        # Use generate_sync with structured=True for JSON output
+        response_str = llm.generate_sync(prompt, structured=True)
         logger.debug(f"Raw response processing result from LLM: {response_str}")
         result = json.loads(response_str)
 

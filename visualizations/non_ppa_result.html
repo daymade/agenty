@@ -2,30 +2,141 @@
     <!DOCTYPE html>
     <html>
     <head>
-        <title>PPA Agent Result: non_ppa</title>
+        <title>PPA Agent Result - Complete Info</title>
         <meta charset="UTF-8">
         <style>
-            body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; }
-            .container { display: flex; width: 95%; max-width: 1600px; margin-top: 20px; gap: 20px; }
-            /* Adjust layout: Make graph container wider */
-            .graph-container { flex: 3; overflow: auto; border: 1px solid #ccc; padding: 10px; background-color: #f9f9f9; }
-            .state-container { flex: 1; border: 1px solid #ccc; padding: 10px; background-color: #f0f0f0; max-height: 90vh; overflow-y: auto; }
-            h1, h2 { text-align: center; }
-            pre { white-space: pre-wrap; word-wrap: break-word; background-color: #fff; padding: 10px; border-radius: 5px; font-size: 12px; }
-            /* Style for the mermaid diagram container */
-            .mermaid { text-align: center; background-color: #f9f9f9; padding: 15px; border-radius: 5px; }
-            .error { color: red; font-weight: bold; }
+            body {
+                font-family: system-ui, -apple-system, sans-serif;
+                margin: 0;
+                padding: 20px;
+                background-color: #f5f5f5;
+            }
+            .main-container {
+                max-width: 1800px;
+                margin: 0 auto;
+                background: white;
+                padding: 20px;
+                border-radius: 8px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .section {
+                margin-bottom: 30px;
+                padding: 20px;
+                background: #fff;
+                border-radius: 8px;
+                border: 1px solid #e0e0e0;
+            }
+            .flex-container {
+                display: flex;
+                gap: 20px;
+                margin-top: 20px;
+            }
+            .graph-container {
+                flex: 2;
+                min-width: 0;
+            }
+            .details-container {
+                flex: 1;
+                min-width: 0;
+            }
+            h1, h2, h3 {
+                color: #2c3e50;
+                margin-top: 0;
+            }
+            .message {
+                background: #f8f9fa;
+                padding: 15px;
+                margin: 10px 0;
+                border-radius: 4px;
+                border-left: 4px solid #007bff;
+            }
+            .message.requires-review {
+                border-left-color: #ffc107;
+            }
+            pre {
+                background: #f8f9fa;
+                padding: 15px;
+                border-radius: 4px;
+                overflow-x: auto;
+                font-size: 13px;
+                line-height: 1.5;
+            }
+            .customer-info {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                gap: 10px;
+                margin: 10px 0;
+            }
+            .info-item {
+                background: #f8f9fa;
+                padding: 10px;
+                border-radius: 4px;
+            }
+            .info-label {
+                font-weight: bold;
+                color: #666;
+            }
+            .mermaid {
+                background: white;
+                padding: 20px;
+                border-radius: 4px;
+            }
+            .missing-info {
+                color: #dc3545;
+                font-style: italic;
+            }
+            .badge {
+                display: inline-block;
+                padding: 3px 8px;
+                border-radius: 12px;
+                font-size: 12px;
+                font-weight: 500;
+                margin-left: 8px;
+            }
+            .badge.review {
+                background-color: #fff3cd;
+                color: #856404;
+            }
+            .badge.type {
+                background-color: #e2e3e5;
+                color: #383d41;
+            }
         </style>
-        <!-- Load Mermaid JS from CDN -->
         <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
     </head>
     <body>
-        <h1>PPA Agent Result: non_ppa</h1>
-        <div class="container">
-            <div class="graph-container">
-                <h2>Workflow Graph</h2>
-                <!-- Embed Mermaid definition -->
-                <pre class="mermaid">
+        <div class="main-container">
+            <h1>PPA Agent Result - Complete Info</h1>
+            
+            <div class="section">
+                <h2>Input Email</h2>
+                <pre>
+        Hi, I'm interested in getting homeowners insurance for my new house.
+        Can you help me with that?
+        </pre>
+            </div>
+
+            <div class="section">
+                <h2>Extracted Customer Information</h2>
+                <div class="customer-info">
+                    <div class="info-item missing-info">No customer information available</div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>Missing Information</h2>
+                <div>No missing information</div>
+            </div>
+
+            <div class="section">
+                <h2>Generated Messages (0)</h2>
+                <div>No messages generated</div>
+            </div>
+
+            <div class="flex-container">
+                <div class="graph-container section">
+                    <h2>Workflow Graph</h2>
+                    <pre class="mermaid">
 ---
 config:
   flowchart:
@@ -72,18 +183,19 @@ graph TD;
 	classDef first fill-opacity:0
 	classDef last fill:#bfb6fc
 
-                </pre>
-            </div>
-            <div class="state-container">
-                <h2>Final State</h2>
-                <pre>{
-  "thread_id": "bf40e0d8374d474d9270696f479013ca",
+                    </pre>
+                </div>
+                
+                <div class="details-container section">
+                    <h2>Complete State</h2>
+                    <pre>{
+  "thread_id": "d997767c598b4c6895e4871b8c9396ce",
   "customer_email": "\n        Hi, I'm interested in getting homeowners insurance for my new house.\n        Can you help me with that?\n        ",
   "email_thread": [
     {
       "role": "customer",
       "content": "\n        Hi, I'm interested in getting homeowners insurance for my new house.\n        Can you help me with that?\n        ",
-      "timestamp": "2025-04-15T03:11:14.987724"
+      "timestamp": "2025-04-15T04:59:04.619864"
     }
   ],
   "customer_info": {},
@@ -100,18 +212,19 @@ graph TD;
   "quote_data": null,
   "proof_of_discount": null,
   "messages": [],
-  "requires_review": true,
+  "requires_review": false,
   "intent": "new_business",
   "lob": "HOME",
   "status": "new",
   "discount_status": null,
   "customer_question": null
 }</pre>
+                </div>
             </div>
         </div>
-        <!-- Initialize Mermaid -->
         <script>
             mermaid.initialize({ startOnLoad: true });
         </script>
     </body>
     </html>
+    

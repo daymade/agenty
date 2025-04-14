@@ -56,23 +56,19 @@ class GeminiProvider(BaseLLMProvider, BaseModel):
         # Initialize the client using the API key
         # SDK automatically picks up GOOGLE_API_KEY if api_key is None/empty
         self._client = genai.Client(api_key=self.api_key if self.api_key else None)
-        # No need for genai.configure
-        # No need to create GenerativeModel instance here
 
-    def generate_sync(self, prompt: str, **kwargs: Any) -> str:
+    def generate_sync(self, prompt: str, structured: bool = False, **kwargs: Any) -> str:
         """Generate text from prompt synchronously using the NEW Gemini SDK."""
         # Use GenerateContentConfig with camelCase based on migration guide
         config = genai.types.GenerateContentConfig(
             temperature=self.temperature,
-            responseMimeType="application/json", # Use camelCase
-            # Add other config like maxOutputTokens, stopSequences if needed
+            responseMimeType="application/json" if structured else None,
         )
         try:
-            # Use client.models.generate_content based on migration guide
             response: genai.types.GenerateContentResponse = self._client.models.generate_content(
-                model=f"models/{self.model}", # Model name often needs prefix
+                model=self.model,
                 contents=prompt,
-                config=config,
+                config=config,  # Use config instead of generation_config
                 **kwargs
             )
 
@@ -85,32 +81,41 @@ class GeminiProvider(BaseLLMProvider, BaseModel):
                 else:
                     logger.warning("Gemini response empty.")
                 raise ValueError(content)
-            return response.text # Return the text content directly
+            
+            # For structured output, validate JSON
+            if structured:
+                try:
+                    json_str = response.text
+                    json.loads(json_str)  # Validate JSON
+                    return json_str
+                except json.JSONDecodeError:
+                    logger.error(f"Invalid JSON response from Gemini: {response.text}")
+                    raise ValueError("Response was not valid JSON")
+            
+            # For unstructured output, return text directly
+            return response.text
 
-        # Use new error handling based on migration guide
         except genai.errors.APIError as e:
-            # Check if this is a safety error
             if "blocked" in str(e).lower() or "safety" in str(e).lower():
                  logger.warning(f"Gemini prompt likely blocked: {e}")
                  raise ValueError(f"Response blocked due to safety concerns: {e}")
             logger.error(f"Gemini API error: {e}", exc_info=True)
-            raise # Re-raise other API errors
+            raise
         except Exception as e:
             logger.error(f"Gemini generic error ({type(e).__name__}): {e}", exc_info=True)
             raise
 
-    async def generate(self, prompt: str, **kwargs: Any) -> str:
+    async def generate(self, prompt: str, structured: bool = False, **kwargs: Any) -> str:
         """Generate text from prompt asynchronously using the NEW Gemini SDK."""
         config = genai.types.GenerateContentConfig(
             temperature=self.temperature,
-            responseMimeType="application/json",
+            responseMimeType="application/json" if structured else None,
         )
         try:
-            # Use client.models.generate_content_async based on migration guide
             response: genai.types.GenerateContentResponse = await self._client.models.generate_content_async(
-                model=f"models/{self.model}", # Add prefix
+                model=self.model,
                 contents=prompt,
-                config=config,
+                config=config,  # Use config instead of generation_config
                 **kwargs
             )
 
@@ -122,6 +127,18 @@ class GeminiProvider(BaseLLMProvider, BaseModel):
                 else:
                     logger.warning("Gemini response empty (async).")
                 raise ValueError(content)
+            
+            # For structured output, validate JSON
+            if structured:
+                try:
+                    json_str = response.text
+                    json.loads(json_str)  # Validate JSON
+                    return json_str
+                except json.JSONDecodeError:
+                    logger.error(f"Invalid JSON response from Gemini: {response.text}")
+                    raise ValueError("Response was not valid JSON (async)")
+            
+            # For unstructured output, return text directly
             return response.text
 
         except (genai.types.BlockedPromptException, genai.types.StopCandidateException) as e:
@@ -200,12 +217,12 @@ class GeminiConfig(BaseModel):
     """Configuration for Gemini provider."""
 
     api_key: str = Field(description="The API key to use")
-    model: str = Field(default="gemini-2.5-pro-exp-03-25", description="The model to use")
+    model: str = Field(default="gemini-2.5-pro-preview-03-25", description="The model to use")
 
     @classmethod
     def from_env(cls) -> "GeminiConfig":
         """Create a config from environment variables."""
         return cls(
             api_key=os.getenv("GEMINI_API_KEY", ""),
-            model=os.getenv("GEMINI_MODEL", "gemini-2.5-pro-exp-03-25"),
+            model=os.getenv("GEMINI_MODEL", "gemini-2.5-pro-preview-03-25"),
         )
