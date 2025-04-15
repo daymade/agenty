@@ -3,6 +3,7 @@
 import json
 import logging
 import os
+import re
 from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Any, List, Optional
@@ -84,13 +85,29 @@ class GeminiProvider(BaseLLMProvider, BaseModel):
             
             # For structured output, validate JSON
             if structured:
+                raw_text = response.text
+                json_str = raw_text # Default to raw text
+                # Try to extract JSON from markdown code fences
+                match = re.search(r"```(?:json)?\n(.*?)```", raw_text, re.DOTALL)
+                if match:
+                    extracted = match.group(1).strip()
+                    # Basic check if it looks like JSON before overriding
+                    if extracted.startswith('{') and extracted.endswith('}'): 
+                        json_str = extracted
+                        logger.debug(f"Extracted JSON from markdown fences: {json_str}")
+                    else:
+                        logger.warning(f"Found markdown fences but content doesn't look like JSON: {extracted}")
+                else:
+                     logger.debug("No markdown fences found, attempting to parse raw text.")
+
                 try:
-                    json_str = response.text
-                    json.loads(json_str)  # Validate JSON
+                    # json_str = response.text # Old logic
+                    json.loads(json_str)  # Validate extracted/raw JSON
                     return json_str
-                except json.JSONDecodeError:
-                    logger.error(f"Invalid JSON response from Gemini: {response.text}")
-                    raise ValueError("Response was not valid JSON")
+                except json.JSONDecodeError as e:
+                    logger.error(f"Invalid JSON response from Gemini after extraction attempt. Original text: '{raw_text}', Parsed string: '{json_str}', Error: {e}")
+                    # logger.error(f"Invalid JSON response from Gemini: {response.text}") # Old log
+                    raise ValueError("Response could not be parsed as valid JSON")
             
             # For unstructured output, return text directly
             return response.text
@@ -136,7 +153,7 @@ class GeminiProvider(BaseLLMProvider, BaseModel):
                     return json_str
                 except json.JSONDecodeError:
                     logger.error(f"Invalid JSON response from Gemini: {response.text}")
-                    raise ValueError("Response was not valid JSON (async)")
+                    raise ValueError("Response was not valid JSON")
             
             # For unstructured output, return text directly
             return response.text

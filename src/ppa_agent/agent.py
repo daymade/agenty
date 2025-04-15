@@ -159,20 +159,34 @@ class PPAAgent:
 
     def _decide_after_discount_check(self, state: AgentState) -> str:
         discount_status = state.get("discount_status", "error")
-        requires_review = state.get("requires_review")
-        if requires_review is None:
-            requires_review = True
-            logger.warning("requires_review key missing in _decide_after_discount_check, defaulting to True")
+        requires_review = state.get("requires_review", True)
 
         logger.info(
             f"Routing after discount check. Status: {discount_status}, Requires Review: {requires_review}"
         )
 
-        # Force routing to review node for current test structure
-        logger.info("Forcing route to prepare_agency_review_node.")
-        return str("prepare_agency_review_node")
+        if discount_status == "error":
+            return "error_node"
 
-    def _handle_error(self, state: AgentState) -> dict:
+        if requires_review:
+            logger.info("Discount check requires review, routing to prepare_agency_review_node.")
+            return "prepare_agency_review_node"
+        else:
+            logger.info("No review needed after discount check, routing to generate_quote_node.")
+            return "generate_quote_node"
+
+    def _decide_after_quote(self, state: AgentState) -> str:
+        requires_review = state.get("requires_review", True)
+        logger.info(f"Routing after quote generation. Requires Review: {requires_review}")
+
+        if not requires_review:
+            logger.info("Quote generated and no review flagged, ending workflow.")
+            return str(END)
+        else:
+            logger.info("Quote generated but review flagged, proceeding to prepare review.")
+            return "prepare_agency_review_node"
+
+    def _handle_error(self, state: AgentState) -> Dict[str, Any]:
         logger.error(f"Entering error handling node. Current state: {state}")
         error_message = {
             "role": "system",
@@ -247,7 +261,14 @@ class PPAAgent:
                 "error_node": "error_node",
             },
         )
-        workflow.add_edge("generate_quote_node", "prepare_agency_review_node")
+        workflow.add_conditional_edges(
+            "generate_quote_node",
+            self._decide_after_quote,
+            {
+                "prepare_agency_review_node": "prepare_agency_review_node",
+                END: END,
+            },
+        )
         workflow.add_conditional_edges(
             "prepare_agency_review_node",
             self._decide_after_review,
