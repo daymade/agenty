@@ -115,9 +115,6 @@ def test_process_new_business_email_openai(openai_agent):
             "missing_info": [],
         },
         {"status": "no_proof_needed", "message_to_customer": None}, # check_discounts
-        # generate_quote node runs (no LLM call)
-        # prepare_agency_review node runs next (NO LLM CALL HERE EITHER)
-        # "Placeholder review summary for quote...", # REMOVE THIS MOCK
     ]
 
     openai_agent.llm.generate_sync.side_effect = [
@@ -125,20 +122,15 @@ def test_process_new_business_email_openai(openai_agent):
         json.dumps(responses[1]), # lob
         json.dumps(responses[2]), # analyze
         json.dumps(responses[3]), # discount check
-        # REMOVE MOCK for prepare_agency_review
-        # responses[4],
     ]
 
     state = openai_agent.process_email(email)
 
     assert state["customer_email"] == email
     assert state["customer_info"]["driver_name"] == "John Smith"
-    # Revert status assertion back to quote_generated
     assert state["status"] == "quote_generated", f"Expected quote_generated, got {state.get('status')}"
     assert state.get("quote_ready") is True
     assert state["quote_data"] is not None
-    # REMOVE check for message from prepare_agency_review
-    # assert any(msg["type"] == "quote_summary_for_review" for msg in state["messages"])
 
 
 def test_process_new_business_email_gemini(gemini_agent):
@@ -161,8 +153,6 @@ def test_process_new_business_email_gemini(gemini_agent):
             "missing_info": [],
         },
         {"status": "no_proof_needed", "message_to_customer": None}, # check_discounts
-        # NO LLM CALL in prepare_agency_review
-        # "Placeholder review summary for quote...", # REMOVE
     ]
 
     gemini_agent.llm.generate_sync.side_effect = [
@@ -170,20 +160,15 @@ def test_process_new_business_email_gemini(gemini_agent):
         json.dumps(responses[1]),
         json.dumps(responses[2]),
         json.dumps(responses[3]),
-        # REMOVE MOCK
-        # responses[4],
     ]
 
     state = gemini_agent.process_email(email)
 
     assert state["customer_email"] == email
     assert state["customer_info"]["driver_name"] == "John Smith"
-    # Revert status assertion back to quote_generated
     assert state["status"] == "quote_generated", f"Expected quote_generated, got {state.get('status')}"
     assert state.get("quote_ready") is True
     assert state["quote_data"] is not None
-    # REMOVE check for message
-    # assert any(msg["type"] == "quote_summary_for_review" for msg in state["messages"])
 
 
 def test_process_non_business_email(openai_agent):
@@ -218,7 +203,7 @@ def test_process_incomplete_info_email(openai_agent):
         # generate_info_request LLM call (TEXT)
         "To complete your quote, please provide: driver_age, ...",
         # prepare_agency_review node runs next (NO LLM CALL)
-        # "Customer John Smith. PPA. Missing: age, ... Info request sent.", # REMOVE
+        "Mocked review summary for incomplete info test.",
     ]
 
     openai_agent.llm.generate_sync.side_effect = [
@@ -226,8 +211,7 @@ def test_process_incomplete_info_email(openai_agent):
         json.dumps(responses[1]),
         json.dumps(responses[2]),
         responses[3], # generate_info_request call
-        # REMOVE MOCK for prepare_agency_review
-        # responses[4],
+        responses[4],
     ]
     state = openai_agent.process_email(email)
 
@@ -239,8 +223,7 @@ def test_process_incomplete_info_email(openai_agent):
     assert state["requires_review"] is True
     assert state["status"] == "ready_for_review"
     assert any(msg["type"] == "info_request" for msg in state["messages"])
-    # REMOVE check for review_summary message
-    # assert any(msg["type"] == "review_summary" for msg in state["messages"])
+    assert any(msg["type"] == "quote_summary_for_review" for msg in state["messages"])
 
 
 def test_error_handling(openai_agent):
