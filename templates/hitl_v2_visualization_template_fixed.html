@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PPA New Business AI Agent - HITL v2 Flow</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f3f4f6;
+            color: #1f2937;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #4f46e5, #3730a3);
+            color: white;
+            padding: 2rem;
+            border-radius: 0.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            margin: 0;
+            font-size: 1.875rem;
+            font-weight: 700;
+        }
+        
+        .content-card {
+            background: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .section-heading {
+            color: #3730a3;
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin: 2.5rem 0 1.5rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid #e0e7ff;
+        }
+        
+        .email-exchange {
+            margin-bottom: 2rem;
+        }
+        
+        .email-card {
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+        
+        .customer-email {
+            background-color: #f0f9ff;
+            border-left: 4px solid #3b82f6;
+        }
+        
+        .agent-email {
+            background-color: #f0fdf4;
+            border-left: 4px solid #10b981;
+        }
+        
+        .email-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        
+        .email-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 0.75rem;
+        }
+        
+        .customer-icon {
+            background-color: #3b82f6;
+            color: white;
+        }
+        
+        .agent-icon {
+            background-color: #10b981;
+            color: white;
+        }
+        
+        .email-sender {
+            font-weight: 600;
+            margin-right: 0.5rem;
+        }
+        
+        .email-timestamp {
+            color: #6b7280;
+            font-size: 0.875rem;
+        }
+        
+        .email-content {
+            margin-left: 2.5rem;
+            white-space: pre-wrap;
+        }
+        
+        .turn-container {
+            margin-bottom: 2rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+        
+        .turn-header {
+            background-color: #f9fafb;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #e5e7eb;
+            font-weight: 600;
+        }
+        
+        .turn-content {
+            display: flex;
+        }
+        
+        .turn-column {
+            flex: 1;
+            padding: 1rem;
+            border-right: 1px solid #e5e7eb;
+        }
+        
+        .turn-column:last-child {
+            border-right: none;
+        }
+        
+        .column-header {
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            margin-right: 0.5rem;
+        }
+        
+        .badge-hitl {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
+        
+        .badge-accept {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+        
+        .badge-reject {
+            background-color: #fee2e2;
+            color: #b91c1c;
+        }
+        
+        .state-data {
+            font-family: monospace;
+            font-size: 0.875rem;
+            white-space: pre-wrap;
+        }
+        
+        .collapsible {
+            cursor: pointer;
+            padding: 0.5rem;
+            background-color: #f3f4f6;
+            border-radius: 0.25rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .collapsible-content {
+            display: none;
+            padding: 0.5rem;
+            background-color: #f8fafc;
+            border-radius: 0.25rem;
+        }
+        
+        .ai-step-block {
+            background-color: #f9fafb;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.25rem;
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+        }
+        
+        .workflow-diagram {
+            margin-top: 2rem;
+        }
+        
+        .mermaid {
+            background-color: white;
+            padding: 1rem;
+            border-radius: 0.5rem;
+        }
+        
+        .hitl-alert {
+            background-color: #fffbeb;
+            border-left: 4px solid #f59e0b;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 0.25rem;
+        }
+        
+        .hitl-content {
+            background-color: #fff7ed;
+            padding: 0.75rem;
+            border-radius: 0.25rem;
+            margin-top: 0.5rem;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        
+        .decision-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+        
+        .decision-accept {
+            background-color: #10b981;
+        }
+        
+        .decision-reject {
+            background-color: #ef4444;
+        }
+        
+        .feedback-box {
+            background-color: #fff1f2;
+            padding: 0.75rem;
+            border-radius: 0.25rem;
+            margin-top: 0.5rem;
+            font-style: italic;
+        }
+        
+        .turn-marker {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            background-color: #4f46e5;
+            color: white;
+            border-radius: 50%;
+            margin-right: 0.75rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>PPA New Business AI Agent - HITL v2 Flow</h1>
+            <p>Thread ID: {{ thread_id }}</p>
+        </header>
+        
+        <div class="content">
+            <h2 class="section-heading">Email Exchange</h2>
+            <div class="email-exchange">
+                {% for event in timeline %}
+                    {% if event.type == 'Customer Input' %}
+                        <div class="email-card customer-email">
+                            <div class="email-header">
+                                <div class="email-icon customer-icon">
+                                    <i class="fas fa-user"></i>
+                                </div>
+                                <span class="email-sender">Customer</span>
+                                <span class="email-timestamp">{{ event.timestamp }}</span>
+                            </div>
+                            <div class="email-content">{{ event.data.content }}</div>
+                        </div>
+                    {% elif event.type == 'Agent Response' %}
+                        <div class="email-card agent-email">
+                            <div class="email-header">
+                                <div class="email-icon agent-icon">
+                                    <i class="fas fa-robot"></i>
+                                </div>
+                                <span class="email-sender">AI Agent</span>
+                                <span class="email-timestamp">{{ event.timestamp }}</span>
+                            </div>
+                            <div class="email-content">{{ event.data.content }}</div>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            
+            <h2 class="section-heading">Turn-by-Turn Workflow</h2>
+            
+            {% set turn_counter = 1 %}
+            {% for event in timeline %}
+                {% if event.type == 'Customer Input' %}
+                    <div class="turn-container">
+                        <div class="turn-header">
+                            <span class="turn-marker">{{ turn_counter }}</span>
+                            Customer Email Processing
+                        </div>
+                        <div class="turn-content">
+                            <div class="turn-column">
+                                <div class="column-header">Customer</div>
+                                <div class="email-card customer-email" style="margin: 0;">
+                                    <div class="email-content" style="margin-left: 0;">{{ event.data.content }}</div>
+                                </div>
+                            </div>
+                            
+                            {% set current_turn = turn_counter %}
+                            {% set turn_counter = turn_counter + 1 %}
+                            
+                            <div class="turn-column">
+                                <div class="column-header">AI Agent Processing</div>
+                                {% set processing_events = [] %}
+                                {% for proc_event in timeline %}
+                                    {% if proc_event.turn == current_turn and proc_event.type == 'Processing Step' %}
+                                        {% set _ = processing_events.append(proc_event) %}
+                                    {% endif %}
+                                {% endfor %}
+                                
+                                {% for proc_event in processing_events %}
+                                    <div class="ai-step-block">
+                                        <i class="fas fa-cog text-gray-500"></i> {{ proc_event.description }}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                            
+                            <div class="turn-column">
+                                <div class="column-header">Agency</div>
+                                {% set hitl_events = [] %}
+                                {% set agency_decisions = [] %}
+                                
+                                {% for hitl_event in timeline %}
+                                    {% if hitl_event.turn == current_turn and hitl_event.type == 'HITL Trigger' %}
+                                        {% set _ = hitl_events.append(hitl_event) %}
+                                    {% endif %}
+                                    {% if hitl_event.turn == current_turn and hitl_event.type == 'Agency Decision' %}
+                                        {% set _ = agency_decisions.append(hitl_event) %}
+                                    {% endif %}
+                                {% endfor %}
+                                
+                                {% for hitl_event in hitl_events %}
+                                    <div class="hitl-alert">
+                                        <div>
+                                            <span class="badge badge-hitl">HITL Review</span>
+                                            <strong>{{ hitl_event.data.step }}</strong> requires human review
+                                        </div>
+                                        <div class="hitl-content">{{ hitl_event.data.content }}</div>
+                                    </div>
+                                {% endfor %}
+                                
+                                {% for agency_decision in agency_decisions %}
+                                    <div class="content-card" style="margin: 0; padding: 1rem;">
+                                        {% if agency_decision.data.decision == 'accepted' %}
+                                            <div>
+                                                <span class="decision-indicator decision-accept"></span>
+                                                <span class="badge badge-accept">Accepted</span>
+                                                <strong>{{ agency_decision.data.step }}</strong>
+                                            </div>
+                                            <div class="space-y-2 mb-3">
+                                                <div class="ai-step-block"><i class="fas fa-history text-gray-500"></i> Recorded Decision: {{ agency_decision.data.step }} = accepted</div>
+                                                <div class="ai-step-block"><i class="fas fa-hourglass-half text-purple-500"></i> Status updated to: {{ events[-1].state.status }}</div>
+                                                <div class="ai-step-block"><i class="fas fa-lock text-gray-500"></i> step_requiring_review cleared</div>
+                                            </div>
+                                        {% else %}
+                                            <div>
+                                                <span class="decision-indicator decision-reject"></span>
+                                                <span class="badge badge-reject">Rejected</span>
+                                                <strong>{{ agency_decision.data.step }}</strong>
+                                            </div>
+                                            {% if agency_decision.data.feedback %}
+                                                <div class="feedback-box">
+                                                    <i class="fas fa-comment-dots text-red-500 mr-2"></i>
+                                                    Feedback: {{ agency_decision.data.feedback }}
+                                                </div>
+                                            {% endif %}
+                                            <div class="space-y-2 mt-3">
+                                                <div class="ai-step-block"><i class="fas fa-history text-gray-500"></i> Recorded Decision: {{ agency_decision.data.step }} = rejected</div>
+                                                <div class="ai-step-block"><i class="fas fa-redo text-amber-500"></i> Retry count increased for {{ agency_decision.data.step }}</div>
+                                                <div class="ai-step-block"><i class="fas fa-hourglass-half text-purple-500"></i> Status maintained as: {{ events[-1].state.status }}</div>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+            {% endfor %}
+            
+            <h2 class="section-heading">State Data</h2>
+            <div class="content-card">
+                <div class="collapsible">
+                    <i class="fas fa-chevron-down"></i> Final State
+                </div>
+                <div class="collapsible-content state-data">{{ final_state | tojson(indent=2) }}</div>
+            </div>
+            
+            <h2 class="section-heading">Workflow Diagram</h2>
+            <div class="content-card">
+                <div id="mermaid-diagram">
+                    <pre class="mermaid">{{ mermaid_graph_markdown }}</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@latest/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base',
+            themeVariables: {
+                primaryColor: '#f0f2ff',
+                primaryTextColor: '#3730a3',
+                primaryBorderColor: '#c7d2fe',
+                lineColor: '#a5b4fc'
+            }
+        });
+        
+        // Toggle collapsible sections
+        document.querySelectorAll('.collapsible').forEach(button => {
+            button.addEventListener('click', () => {
+                const content = button.nextElementSibling;
+                if (content.style.display === 'block') {
+                    content.style.display = 'none';
+                    button.querySelector('i').classList.remove('fa-chevron-up');
+                    button.querySelector('i').classList.add('fa-chevron-down');
+                } else {
+                    content.style.display = 'block';
+                    button.querySelector('i').classList.remove('fa-chevron-down');
+                    button.querySelector('i').classList.add('fa-chevron-up');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

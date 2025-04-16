@@ -1,0 +1,1071 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PPA New Business AI Agent - HITL v2 Flow</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/animate.css@4.1.1/animate.min.css">
+    <style>
+        :root {
+            --primary-color: #4f46e5; /* Indigo-600 */
+            --primary-light: #e0e7ff; /* Indigo-100 */
+            --secondary-color: #3730a3; /* Indigo-800 */
+            --success-color: #10b981; /* Green-500 */
+            --warning-color: #f59e0b; /* Amber-500 */
+            --danger-color: #ef4444; /* Red-500 */
+            --light-gray: #f9fafb; /* Gray-50 */
+            --border-color: #e5e7eb; /* Gray-200 */
+            --customer-color: #dbeafe; /* Blue-100 */
+            --customer-border: #93c5fd; /* Blue-300 */
+            --ai-color: #d1fae5; /* Green-100 */
+            --ai-border: #6ee7b7; /* Green-300 */
+            --agency-color: #fef3c7; /* Amber-100 */
+            --agency-border: #fcd34d; /* Amber-300 */
+            --hitl-color: #fff9c4; /* Yellow-100 */
+            --hitl-border: #fef08a; /* Yellow-200 */
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background-color: #f3f4f6; /* Gray-100 */
+            color: #1f2937; /* Gray-800 */
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 2rem;
+            border-radius: 0.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        
+        header h1 {
+            margin: 0;
+            font-size: 1.875rem;
+            font-weight: 700;
+        }
+        
+        header p {
+            margin: 0.5rem 0 0;
+            opacity: 0.9;
+            font-size: 1rem;
+        }
+        
+        .content {
+            padding: 0;
+        }
+        
+        h2.section-heading {
+            color: var(--secondary-color);
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin: 2.5rem 0 1.5rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid var(--primary-light);
+            position: relative;
+        }
+        
+        h2.section-heading::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 100px;
+            height: 2px;
+            background-color: var(--primary-color);
+        }
+        
+        /* Content Cards and Email Exchange Styling */
+        .content-card {
+            background: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border-color);
+            transition: all 0.2s ease-in-out;
+        }
+        
+        .content-card:hover {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transform: translateY(-2px);
+        }
+        
+        .wow-effect {
+            animation: fadeIn 0.8s ease-in-out;
+        }
+        
+        .email-exchange {
+            margin-bottom: 2rem;
+        }
+        
+        .email-header {
+            background: #f8fafc;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        
+        .icon-customer, .icon-agent, .icon-system, .icon-ai {
+            margin-right: 0.5rem;
+        }
+        
+        .icon-customer {
+            color: #3b82f6; /* Blue-500 */
+        }
+        
+        .icon-agent {
+            color: #8b5cf6; /* Violet-500 */
+        }
+        
+        .icon-system {
+            color: #10b981; /* Green-500 */
+        }
+        
+        .icon-ai {
+            color: #6366f1; /* Indigo-500 */
+        }
+        
+        .email-body {
+            padding: 1rem 1.25rem;
+            white-space: pre-line;
+            color: #374151; /* Gray-700 */
+        }
+        
+        .email-timestamp {
+            font-size: 0.75rem;
+            color: #6b7280; /* Gray-500 */
+            margin-top: 0.75rem;
+            font-style: italic;
+        }
+        
+        /* Turn-by-Turn Workflow Styling */
+        .workflow-turns {
+            margin-top: 2rem;
+        }
+        
+        .timeline-connector {
+            width: 2px;
+            height: 100%;
+            background-color: #d1d5db; /* Gray-300 */
+            margin-left: 1.5rem;
+        }
+        
+        .turn {
+            display: flex;
+            margin-bottom: 2rem;
+        }
+        
+        .turn-marker {
+            width: 3rem;
+            height: 3rem;
+            background-color: var(--primary-color);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.25rem;
+            margin-right: 1.5rem;
+            flex-shrink: 0;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        
+        .turn h3 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--secondary-color);
+            margin-bottom: 1.25rem;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        
+        .badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 9999px;
+            font-weight: 500;
+            margin-left: 0.5rem;
+            white-space: nowrap;
+        }
+        
+        .badge-success {
+            background-color: #ecfdf5; /* Green-50 */
+            color: #059669; /* Green-600 */
+            border: 1px solid #a7f3d0; /* Green-200 */
+        }
+        
+        .badge-review {
+            background-color: #fffbeb; /* Amber-50 */
+            color: #d97706; /* Amber-600 */
+            border: 1px solid #fcd34d; /* Amber-300 */
+        }
+        
+        .badge-error {
+            background-color: #fef2f2; /* Red-50 */
+            color: #dc2626; /* Red-600 */
+            border: 1px solid #fecaca; /* Red-200 */
+        }
+        
+        .badge-neutral {
+            background-color: #f3f4f6; /* Gray-100 */
+            color: #4b5563; /* Gray-600 */
+            border: 1px solid #d1d5db; /* Gray-300 */
+        }
+        
+        .grid {
+            display: grid;
+            gap: 1.5rem;
+        }
+        
+        @media (min-width: 768px) {
+            .md\:grid-cols-2 {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+        
+        .action-header, .email-header {
+            background-color: #f8fafc; /* Slate-50 */
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        
+        .action-body, .email-body {
+            padding: 1rem 1.25rem;
+            color: #374151; /* Gray-700 */
+        }
+        
+        .action-accept {
+            border-left: 4px solid var(--success-color);
+        }
+        
+        .action-reject {
+            border-left: 4px solid var(--danger-color);
+        }
+        
+        .human-action {
+            padding: 0.75rem 1rem;
+            border-radius: 0.375rem;
+            margin-top: 0.5rem;
+        }
+        
+        .icon-accept {
+            color: var(--success-color);
+        }
+        
+        .icon-reject {
+            color: var(--danger-color);
+        }
+        
+        .icon-review {
+            color: var(--warning-color);
+        }
+        
+        /* AI Step Blocks */
+        .space-y-2 > * + * {
+            margin-top: 0.5rem;
+        }
+        
+        .space-y-3 > * + * {
+            margin-top: 0.75rem;
+        }
+        
+        .mb-2 {
+            margin-bottom: 0.5rem;
+        }
+        
+        .mb-3 {
+            margin-bottom: 0.75rem;
+        }
+        
+        .mt-3 {
+            margin-top: 0.75rem;
+        }
+        
+        .mt-4 {
+            margin-top: 1rem;
+        }
+        
+        .mb-4 {
+            margin-bottom: 1rem;
+        }
+        
+        .ai-step-block {
+            padding: 0.5rem 0.75rem;
+            background-color: #f9fafb; /* Gray-50 */
+            border: 1px solid #e5e7eb; /* Gray-200 */
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+        }
+        
+        .ai-step-block i {
+            margin-top: 0.125rem;
+        }
+        
+        .ai-output-block {
+            padding: 0.75rem 1rem;
+            background-color: #f3f4f6; /* Gray-100 */
+            border: 1px solid #d1d5db; /* Gray-300 */
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            white-space: pre-line;
+        }
+        
+        .rejected-output-block {
+            padding: 0.75rem 1rem;
+            background-color: #fee2e2; /* Red-100 */
+            border: 1px solid #fecaca; /* Red-200 */
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            white-space: pre-line;
+            text-decoration: line-through;
+            color: #7f1d1d; /* Red-900 */
+        }
+        
+        /* HITL Trigger */
+        .hitl-trigger {
+            margin-top: 1rem;
+            padding: 0.75rem 1rem;
+            background-color: #fffbeb; /* Amber-50 */
+            border: 1px solid #fcd34d; /* Amber-300 */
+            border-left: 4px solid #f59e0b; /* Amber-500 */
+            border-radius: 0.375rem;
+        }
+        
+        .hitl-trigger h4 {
+            margin: 0 0 0.5rem 0;
+            display: flex;
+            align-items: center;
+            color: #b45309; /* Amber-700 */
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+        
+        /* State Data */
+        .state-dump {
+            margin-top: 0.5rem;
+            font-size: 0.75rem;
+        }
+        
+        details summary {
+            cursor: pointer;
+            font-size: 0.875rem;
+            color: #4b5563; /* Gray-600 */
+            padding: 0.375rem 0.5rem;
+            background-color: #f3f4f6; /* Gray-100 */
+            border: 1px solid #d1d5db; /* Gray-300 */
+            border-radius: 0.25rem;
+            display: inline-block;
+        }
+        
+        details summary:hover {
+            background-color: #e5e7eb; /* Gray-200 */
+        }
+        
+        /* Processing Steps */
+        .processing-steps {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .processing-steps li {
+            padding: 0.5rem 0;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: flex-start;
+        }
+        
+        .step-bullet {
+            min-width: 0.5rem;
+            height: 0.5rem;
+            border-radius: 50%;
+            background: var(--primary-color);
+            margin-right: 0.75rem;
+            margin-top: 0.5rem;
+        }
+        
+        .step-content {
+            flex-grow: 1;
+        }
+        
+        /* Email Message in Turn View */
+        .email-message {
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 0.75rem;
+            white-space: pre-line;
+            font-size: 0.875rem;
+        }
+        
+        .customer-message {
+            background-color: var(--customer-color);
+            border: 1px solid var(--customer-border);
+        }
+        
+        .ai-message {
+            background-color: var(--ai-color);
+            border: 1px solid var(--ai-border);
+        }
+        
+        /* State Data */
+        .state-data {
+            margin-top: 1rem;
+        }
+        
+        .state-data pre {
+            margin: 0.5rem 0 0 0;
+            padding: 1rem;
+            background-color: #f8f9fa;
+            border: 1px solid #e5e7eb;
+            border-radius: 0 0 0.375rem 0.375rem;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 300px;
+            overflow-y: auto;
+            font-size: 0.75rem;
+            color: #374151;
+        }
+        
+        /* Diagram Section */
+        .diagram-section {
+            margin-top: 3rem;
+            margin-bottom: 3rem;
+        }
+        
+        .mermaid-container {
+            background-color: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            padding: 1.5rem;
+            overflow-x: auto;
+        }
+        
+        .mermaid-diagram {
+            text-align: center;
+            overflow-x: auto;
+        }
+        
+        /* Final State */
+        .final-state {
+            margin-top: 3rem;
+            margin-bottom: 3rem;
+        }
+        
+        /* Text Utilities */
+        .text-center {
+            text-align: center;
+        }
+        
+        .text-sm {
+            font-size: 0.875rem;
+        }
+        
+        .text-xs {
+            font-size: 0.75rem;
+        }
+        
+        .text-gray-500 {
+            color: #6b7280;
+        }
+        
+        .text-gray-600 {
+            color: #4b5563;
+        }
+        
+        .text-gray-700 {
+            color: #374151;
+        }
+        
+        .text-green-600 {
+            color: #059669;
+        }
+        
+        .text-red-600 {
+            color: #dc2626;
+        }
+        
+        .font-semibold {
+            font-weight: 600;
+        }
+        
+        .flex {
+            display: flex;
+        }
+        
+        .flex-1 {
+            flex: 1 1 0%;
+        }
+        
+        .items-center {
+            align-items: center;
+        }
+        
+        .gap-2 {
+            gap: 0.5rem;
+        }
+        
+        .h-8 {
+            height: 2rem;
+        }
+        
+        /* Legacy Log */
+        .legacy-log {
+            margin-top: 30px;
+            margin-bottom: 30px;
+        }
+        
+        .legacy-log summary {
+            cursor: pointer;
+            padding: 10px;
+            background-color: var(--light-gray);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background-color: #e9ecef;
+            border-radius: 5px;
+        }
+        .timeline {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        .message-log {
+            padding: 15px;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .message-entry {
+            margin-bottom: 15px;
+            padding: 10px 15px;
+            border-radius: 8px;
+            position: relative;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+        .message-entry .meta {
+            font-size: 0.8em;
+            color: #6c757d;
+            margin-bottom: 5px;
+            display: block;
+        }
+        .message-entry.customer {
+            background-color: #e7f5ff;
+            border: 1px solid #b3d7ff;
+            margin-left: 0;
+            margin-right: auto;
+        }
+        .message-entry.agency-output {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            margin-left: auto;
+            margin-right: 0;
+            text-align: right;
+        }
+        .message-entry.ai-internal {
+            background-color: #fff3cd;
+            border: 1px solid #ffeeba;
+            margin-left: auto;
+            margin-right: auto; /* Center internal steps slightly */
+            max-width: 90%;
+            font-style: italic;
+            color: #665000;
+            text-align: center;
+            font-size: 0.9em;
+        }
+        .message-entry.ai-internal .meta {
+             text-align: center;
+             width: 100%;
+        }
+        .message-entry .content pre {
+            margin: 5px 0 0 0;
+            padding: 8px;
+            background-color: rgba(255, 255, 255, 0.5);
+            border-radius: 4px;
+            font-size: 0.95em;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            text-align: left;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .mermaid-diagram {
+            text-align: center;
+            margin-top: 20px;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 400px; /* Limit height and add scroll */
+            overflow-y: auto; /* Enable vertical scroll */
+        }
+        code {
+            font-family: 'Courier New', Courier, monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>PPA New Business AI Agent - HITL v2 Flow</h1>
+            <p>Thread ID: {{ thread_id }} | Visualization Generated: {{ timeline[0].timestamp[:10] if timeline else 'N/A' }}</p>
+        </header>
+        
+        <div class="content">
+            <!-- Simulated Email Exchange -->
+            <h2 class="section-heading">Simulated Email Exchange</h2>
+            <div class="email-exchange">
+                {% for event in timeline %}
+                    {% if event.type == 'Customer Input' or (event.type == 'Agent Action' and event.actor == 'Agent') %}
+                        {% set from_customer = event.actor == 'Customer' %}
+                        {% if from_customer %}
+                            {% set email_content = event.data.get('email_content', event.description) %}
+                        {% else %}
+                            {% set email_content = event.data.get('email_content', '') %}
+                        {% endif %}
+                        
+                        {% if email_content %}
+                            <div class="content-card wow-effect">
+                                <div class="email-header">
+                                    <i class="fas {% if from_customer %}fa-envelope icon-customer{% else %}fa-paper-plane icon-system{% endif %}"></i>
+                                    <strong>{% if from_customer %}From: Customer{% else %}Email Sent to Customer{% endif %}</strong>
+                                </div>
+                                <div class="email-body">
+                                    <p>{{ email_content }}</p>
+                                    <em class="text-sm text-gray-500 block mt-3">Timestamp: {{ event.timestamp }}</em>
+                                </div>
+                            </div>
+                        {% endif %}
+                    {% endif %}
+                {% endfor %}
+            </div>
+            
+            <!-- Turn-by-Turn Workflow Display -->
+            <h2 class="section-heading">Turn-by-Turn Workflow</h2>
+            <div class="workflow-turns">
+                {% set current_turn = 0 %}
+                {% set turn_events = {} %}
+                
+                {# Group events by turn based on Customer Input events #}
+                {% for event in timeline %}
+                    {% if event.type == 'Customer Input' %}
+                        {% set current_turn = current_turn + 1 %}
+                        {% if current_turn not in turn_events %}
+                            {% set _ = turn_events.update({current_turn: []}) %}
+                        {% endif %}
+                    {% endif %}
+                    
+                    {% if current_turn > 0 %}
+                        {% set _ = turn_events[current_turn].append(event) %}
+                    {% endif %}
+                {% endfor %}
+                
+                {# Display each turn #}
+                {% for turn_num, events in turn_events.items() %}
+                    {% set has_customer = events|selectattr('actor', 'equalto', 'Customer')|list|length > 0 %}
+                    {% set has_agency = events|selectattr('type', 'equalto', 'Agency Decision')|list|length > 0 %}
+                    {% set has_hitl = events|selectattr('state.step_requiring_review', 'defined')|selectattr('state.step_requiring_review', 'ne', None)|list|length > 0 %}
+                    {% set agency_decision = events|selectattr('type', 'equalto', 'Agency Decision')|list|first if has_agency else None %}
+                    
+                    <div class="flex">
+                        <div class="turn-marker">{{ turn_num }}</div>
+                        <div class="flex-1">
+                            <h3 class="text-2xl font-semibold mb-4 text-indigo-700">
+                                Turn {{ turn_num }}: 
+                                {% if turn_num == 1 %}
+                                    Customer Inquiry & Initial AI Analysis
+                                {% elif has_agency %}
+                                    Agency {% if agency_decision.data.get('decision') == 'accepted' %}Accepts{% else %}Rejects{% endif %} 
+                                    {{ agency_decision.data.get('step', 'Analysis') | replace('_', ' ') | title }}
+                                {% elif has_customer %}
+                                    Customer Provides Information
+                                {% else %}
+                                    AI Processing & Analysis
+                                {% endif %}
+                                
+                                {% if has_hitl %}
+                                    <span class="badge badge-review">HITL Triggered</span>
+                                {% endif %}
+                                
+                                {% if has_agency and agency_decision.data.get('decision') == 'accepted' %}
+                                    <span class="badge badge-success">HITL Resolved</span>
+                                {% elif has_agency and agency_decision.data.get('decision') == 'rejected' %}
+                                    <span class="badge badge-error">HITL Resolved (Rejected)</span>
+                                {% endif %}
+                            </h3>
+                            
+                            <div class="grid md:grid-cols-2 gap-6">
+                                {# Customer Content #}
+                                {% if has_customer %}
+                                    <div class="content-card wow-effect">
+                                        <div class="email-header">
+                                            <i class="fas fa-envelope icon-customer"></i> <strong>From:</strong> Customer
+                                        </div>
+                                        <div class="email-body">
+                                            {% for event in events if event.actor == 'Customer' %}
+                                                <p>"{{ event.data.get('email_content', event.description) }}"</p>
+                                                <em class="text-sm text-gray-500 block mt-4">Timestamp: {{ event.timestamp }}</em>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                {% endif %}
+                                
+                                {# AI Processing #}
+                                <div class="content-card wow-effect">
+                                    <div class="action-header">
+                                        <i class="fas fa-cogs icon-ai"></i> <strong>AI Agent Processing</strong>
+                                    </div>
+                                    <div class="action-body">
+                                        <p class="mb-3 text-gray-700">AI processes the {% if turn_num == 1 %}request{% else %}reply{% endif %}:</p>
+                                        <div class="space-y-2 mb-3">
+                                            {% for event in events if event.actor != 'Customer' and event.type != 'Agency Decision' %}
+                                                <div class="ai-step-block">
+                                                    <i class="fas {% if 'status' in event.description %}fa-flag-checkered text-purple-500{% else %}fa-check-circle text-green-500{% endif %}"></i>
+                                                    {{ event.description }}
+                                                    {% if event.state and event.state.status %}
+                                                        <code>({{ event.state.status }})</code>
+                                                    {% endif %}
+                                                </div>
+                                            {% endfor %}
+                                        </div>
+                                        
+                                        {% if has_hitl %}
+                                            {% set review_events = events|selectattr('state.step_requiring_review', 'defined')|selectattr('state.step_requiring_review', 'ne', None)|list %}
+                                            {% if review_events|length > 0 %}
+                                                {% set review_step = review_events[0].state.step_requiring_review %}
+                                                {% set review_content = '' %}
+                                                {% set review_content = '' %}
+                                                {% for msg in review_events[0].state.messages|reverse %}
+                                                    {% if msg.requires_review and not review_content %}
+                                                        {% set review_content = msg.content %}
+                                                    {% endif %}
+                                                {% endfor %}
+                                                
+                                                <h4 class="text-sm font-semibold text-gray-600 mt-4 mb-1">Generated Content (Requires Review):</h4>
+                                                <div class="ai-output-block">
+                                                    {{ review_content }}
+                                                </div>
+                                                
+                                                <p class="font-semibold text-amber-700 flex items-center gap-2 my-3">
+                                                    <i class="fas fa-pause-circle icon-review"></i> Workflow Paused for Agency Review
+                                                </p>
+                                            {% endif %}
+                                        {% endif %}
+                                        
+                                        <details class="mt-3">
+                                            <summary class="text-sm">Show State Snapshot (End of Turn {{ turn_num }})</summary>
+                                            <div class="state-dump mt-2">
+                                                <pre>{{ events|last|attr('state')|tojson(indent=2) }}</pre>
+                                            </div>
+                                        </details>
+                                    </div>
+                                </div>
+                                
+                                {# Agency Action #}
+                                {% if has_agency %}
+                                    <div class="content-card wow-effect">
+                                        <div class="action-header">
+                                            <i class="fas fa-user-tie icon-agent"></i> <strong>Agency Action</strong>
+                                        </div>
+                                        <div class="action-body{% if agency_decision.data.get('decision') == 'accepted' %} human-action action-accept{% elif agency_decision.data.get('decision') == 'rejected' %} human-action action-reject{% endif %}">
+                                            {% if agency_decision.data.get('decision') == 'rejected' and agency_decision.data.get('feedback') %}
+                                                <h4 class="text-sm font-semibold text-gray-600 mb-1">Rejected Content:</h4>
+                                                <div class="rejected-output-block mb-3">
+                                                    {% set rejected_content = '' %}
+                                                {% for msg in events|selectattr('state.messages', 'defined')|map(attribute='state.messages')|first|reverse %}
+                                                        {% if msg.requires_review and not rejected_content %}
+                                                            {% set rejected_content = msg.content %}
+                                                            {{ rejected_content }}
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                </div>
+                                            {% endif %}
+                                            
+                                            <p class="text-gray-700 flex items-center gap-2">
+                                                <i class="fas {% if agency_decision.data.get('decision') == 'accepted' %}fa-check-circle icon-accept{% else %}fa-times-circle icon-reject{% endif %} text-xl"></i>
+                                                Agency representative reviews and <strong class="{% if agency_decision.data.get('decision') == 'accepted' %}text-green-600{% else %}text-red-600{% endif %}">{{ agency_decision.data.get('decision') }}</strong> the AI's {{ agency_decision.data.get('step', 'analysis') | replace('_', ' ') | title }}.
+                                                {% if agency_decision.data.get('feedback') %}
+                                                    <br>
+                                                    <span class="text-sm text-gray-500">Feedback: <em class="text-gray-700">"{{ agency_decision.data.get('feedback') }}"</em></span>
+                                                {% endif %}
+                                            </p>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                                
+                                {# Email Sent After Agency Approval #}
+                                {% if has_agency and agency_decision.data.get('decision') == 'accepted' and agency_decision.data.get('step') != 'generate_quote' %}
+                                    {% set email_content = '' %}
+                                    {% set email_content = '' %}
+                                    {% for msg in events|selectattr('state.messages', 'defined')|map(attribute='state.messages')|first|reverse %}
+                                        {% if msg.role == 'agent' and msg.type != 'internal' and not email_content %}
+                                            {% set email_content = msg.content %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    
+                                    {% if email_content %}
+                                        <div class="content-card wow-effect">
+                                            <div class="email-header"><i class="fas fa-paper-plane icon-system"></i> <strong>Email Sent to Customer</strong></div>
+                                            <div class="email-body">
+                                                <p>{{ email_content }}</p>
+                                                <em class="text-sm text-gray-500 block mt-3">Timestamp: {{ events|last|attr('timestamp') }} (After Approval)</em>
+                                            </div>
+                                        </div>
+                                    {% endif %}
+                                {% endif %}
+                            </div>
+                            
+                            {# AI State Update #}
+                            {% if has_agency and agency_decision.data.get('decision') == 'accepted' %}
+                                <div class="content-card wow-effect mt-6">
+                                    <div class="action-header"><i class="fas fa-cogs icon-ai"></i> <strong>AI Agent Final State (Turn {{ turn_num }})</strong></div>
+                                    <div class="action-body">
+                                        <p class="mb-2 text-gray-700">The workflow updates the state after acceptance:</p>
+                                        <div class="space-y-2 mb-3">
+                                            <div class="ai-step-block"><i class="fas fa-history text-gray-500"></i> Recorded Decision: {{ agency_decision.data.get('step') }} = accepted</div>
+                                            <div class="ai-step-block"><i class="fas fa-hourglass-half text-purple-500"></i> Status updated to: {{ events|last|attr('state').status }}</div>
+                                            <div class="ai-step-block"><i class="fas fa-lock text-gray-500"></i> step_requiring_review cleared</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <!-- Connector -->
+                    {% if not loop.last %}
+                        <div class="flex h-8"><div class="timeline-connector"></div></div>
+                    {% endif %}
+                {% endfor %}
+                
+                <!-- Final Turn: Simulated Quote Sending -->
+                {% if turn_events and turn_events|length > 0 and timeline|selectattr('type', 'equalto', 'Agent Action')|selectattr('description', 'contains', 'sends final quote')|list|length > 0 %}
+                    {% set quote_event = timeline|selectattr('type', 'equalto', 'Agent Action')|selectattr('description', 'contains', 'sends final quote')|list|first %}
+                    <div class="flex h-8"><div class="timeline-connector"></div></div>
+                    <div class="flex">
+                        <div class="turn-marker">{{ turn_events|length + 1 }}</div>
+                        <div class="flex-1">
+                            <h3 class="text-2xl font-semibold mb-4 text-indigo-700">Turn {{ turn_events|length + 1 }}: Final Approved Quote Sent <span class="badge badge-neutral">System Action</span></h3>
+                            <div class="content-card wow-effect">
+                                <div class="email-header"><i class="fas fa-paper-plane icon-system"></i> <strong>Email Sent to Customer</strong></div>
+                                <div class="email-body">
+                                    <p>{{ quote_event.data.get('email_content', '') }}</p>
+                                    <em class="text-sm text-gray-500 block mt-3">Timestamp: {{ quote_event.timestamp }}</em>
+                                </div>
+                            </div>
+                            <p class="text-lg font-semibold text-green-600 mt-6 text-center"><i class="fas fa-check-circle mr-2"></i>Workflow Completed Successfully!</p>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+                
+                <!-- Legacy Event Log (Collapsed by Default) -->
+                <details class="legacy-log">
+                    <summary><h2 class="section-heading" style="display: inline-block; margin: 0;">Detailed Event Log (Legacy View)</h2></summary>
+                    <div class="message-log content-card">
+                        {% for event in timeline %}
+                            {% set actor_class = 'ai-internal' %}
+                            {% set message_content = event.description %}
+                            {% set message_actor = event.actor | default('System') %}
+
+                            {% if event.actor == 'Customer' %}
+                                {% set actor_class = 'customer' %}
+                                {% set message_content = event.data.get('email_content', event.description) %}
+                            {% elif event.type == 'Agent Action' and event.actor == 'Agent' %}
+                                {% set actor_class = 'agency-output' %}
+                                {% set message_actor = 'Agency (AI Output)' %}
+                                {% set message_content = event.data.get('email_content', event.description) %}
+                                {% if event.state and event.state.messages %}
+                                   {% set last_msg = event.state.messages[-1] %}
+                                   {% if last_msg.role == 'agent' %}
+                                       {% set message_content = last_msg.content %}
+                                   {% endif %}
+                                {% endif %}
+                            {% elif event.type == 'Agency Decision' %}
+                                {% set actor_class = 'ai-internal' %}
+                                {% set message_actor = 'Agency Reviewer' %}
+                                {% set message_content = event.description ~ " (Decision: " ~ event.data.get('decision', 'N/A') ~ ")" %}
+                            {% elif event.actor == 'Agent' %}
+                                {% set actor_class = 'ai-internal' %}
+                                {% set message_actor = 'AI/System' %}
+                            {% endif %}
+
+                            <div class="message-entry {{ actor_class }}">
+                                <span class="meta">{{ event.timestamp }} - {{ message_actor }} (Type: {{ event.type }})</span>
+                                <div class="content">
+                                    <pre>{{ message_content }}</pre>
+                                </div>
+                                {% if event.data or event.state %}
+                                <details style="font-size: 0.8em; margin-top: 5px; text-align: left;">
+                                    <summary>Raw Event Data</summary>
+                                    {% if event.data %}
+                                    <strong>Data:</strong>
+                                    <pre><code>{{ event.data | tojson(indent=2) }}</code></pre>
+                                    {% endif %}
+                                    {% if event.state %}
+                                    <strong>State Snapshot:</strong>
+                                    <pre><code>{{ event.state | tojson(indent=2) }}</code></pre>
+                                    {% endif %}
+                                </details>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                </details>
+                
+                <!-- LangGraph Workflow -->
+                <section class="diagram-section">
+                    <h2 class="section-heading">LangGraph Workflow & State</h2>
+                    <div class="grid md:grid-cols-5 gap-8">
+                        <div class="md:col-span-3 content-card p-4">
+                            <h3 class="text-xl font-semibold mb-3 text-center text-gray-700">Agent Workflow Graph (Execution Path)</h3>
+                            <p class="text-sm text-center text-gray-600 mb-4">This graph shows the specific nodes executed in this simulation.</p>
+                            <div class="mermaid-container">
+                                <div class="mermaid">
+                                    {{ mermaid_graph_markdown }}
+                                </div>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-4">
+                                <strong>Note:</strong> Represents the execution path for this specific multi-turn test run based on the log. Nodes styled indicate HITL pauses, end-of-turn pauses, or final states.
+                            </p>
+                        </div>
+                        
+                        <div class="md:col-span-2 content-card p-4">
+                            <h3 class="text-xl font-semibold mb-3 text-center text-gray-700">Key State Changes Summary</h3>
+                            <div class="space-y-3 text-sm">
+                                {% set turn_events = {} %}
+                                {% set current_turn = 0 %}
+                                
+                                {# Group events by turn based on Customer Input events #}
+                                {% for event in timeline %}
+                                    {% if event.type == 'Customer Input' %}
+                                        {% set current_turn = current_turn + 1 %}
+                                        {% if current_turn not in turn_events %}
+                                            {% set _ = turn_events.update({current_turn: []}) %}
+                                        {% endif %}
+                                    {% endif %}
+                                    
+                                    {% if current_turn > 0 %}
+                                        {% set _ = turn_events[current_turn].append(event) %}
+                                    {% endif %}
+                                {% endfor %}
+                                
+                                {% for turn_num, events in turn_events.items() %}
+                                    <div>
+                                        <h4 class="font-medium text-indigo-600">Turn {{ turn_num }}:</h4>
+                                        <ul class="list-disc list-inside pl-4 text-gray-600">
+                                            {% if events|last|attr('state').status %}
+                                                <li>`status`: `{{ events|last|attr('state').status }}`</li>
+                                            {% endif %}
+                                            {% if events|last|attr('state').step_requiring_review %}
+                                                <li>`step_requiring_review`: `{{ events|last|attr('state').step_requiring_review }}`</li>
+                                            {% else %}
+                                                <li>`step_requiring_review`: `null`</li>
+                                            {% endif %}
+                                            {% if events|selectattr('type', 'equalto', 'Agency Decision')|list|length > 0 %}
+                                                {% set decision = events|selectattr('type', 'equalto', 'Agency Decision')|list|first %}
+                                                <li>`last_human_decision_for_step`: `{{ decision.data.get('decision') }}`</li>
+                                            {% endif %}
+                                        </ul>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- Final State -->
+                <div class="final-state">
+                    <h2 class="section-heading">Final State</h2>
+                    <div class="content-card p-4">
+                        <details open>
+                            <summary>Full State Data</summary>
+                            <pre>{{ final_state | tojson(indent=2) }}</pre>
+                        </details>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="text-center py-6 bg-gray-200 text-gray-600 text-sm mt-16 border-t border-gray-300">
+        PPA Agent Visualization | Generated: {{ timeline[0].timestamp[:19] if timeline else 'N/A' }}
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@latest/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base', // Using 'base' for better customization control
+            themeVariables: {
+                primaryColor: '#f0f2ff', // Light indigo background for nodes
+                primaryTextColor: '#3730a3', // Dark indigo text
+                primaryBorderColor: '#c7d2fe', // Lighter indigo border
+                lineColor: '#a5b4fc', // Medium indigo lines
+                secondaryColor: '#dcfce7', // Light green for secondary states
+                tertiaryColor: '#ffedd5', // Light orange for tertiary/HITL
+                fontSize: '12px',
+                // Specific node type colors
+                nodeBorder: '#a5b4fc',
+                // HITL node styles
+                clusterBkg: '#fffbeb', // Light yellow for cluster/HITL background
+                clusterBorder: '#fcd34d', // Amber border
+            },
+            flowchart: {
+                curve: 'basis',
+                htmlLabels: true
+            }
+        });
+
+        // Add generation time
+        document.addEventListener('DOMContentLoaded', function() {
+            const generationTime = document.getElementById('generation-time');
+            if (generationTime) {
+                generationTime.textContent = new Date().toISOString().replace('T', ' ').substring(0, 19);
+            }
+        });
+
+        // Add animation class to content cards
+        document.addEventListener('DOMContentLoaded', function() {
+            const cards = document.querySelectorAll('.wow-effect');
+            cards.forEach((card, index) => {
+                setTimeout(() => {
+                    card.classList.add('animate__animated', 'animate__fadeInUp');
+                }, index * 100);
+            });
+        });
+    </script>
+</body>
+</html>

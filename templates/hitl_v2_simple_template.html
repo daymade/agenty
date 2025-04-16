@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PPA New Business AI Agent - HITL v2 Flow</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f3f4f6;
+            color: #1f2937;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #4f46e5, #3730a3);
+            color: white;
+            padding: 2rem;
+            border-radius: 0.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            margin: 0;
+            font-size: 1.875rem;
+            font-weight: 700;
+        }
+        
+        .content-card {
+            background: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        pre {
+            background-color: #f8f9fa;
+            padding: 1rem;
+            border-radius: 0.375rem;
+            overflow-x: auto;
+            font-size: 0.875rem;
+        }
+        
+        .section-heading {
+            color: #3730a3;
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin: 2.5rem 0 1.5rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid #e0e7ff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>PPA New Business AI Agent - HITL v2 Flow</h1>
+            <p>Thread ID: {{ thread_id }}</p>
+        </header>
+        
+        <div class="content">
+            <h2 class="section-heading">Workflow Summary</h2>
+            <div class="content-card">
+                <p>This visualization shows a simplified view of the HITL v2 workflow.</p>
+                <p>Number of events: {{ timeline|length }}</p>
+            </div>
+            
+            <h2 class="section-heading">Timeline Events</h2>
+            <div class="content-card">
+                <ul>
+                {% for event in timeline %}
+                    <li>
+                        <strong>{{ event.timestamp }}</strong>: {{ event.type }} - 
+                        {% if event.actor %}Actor: {{ event.actor }} - {% endif %}
+                        {{ event.description }}
+                    </li>
+                {% endfor %}
+                </ul>
+            </div>
+            
+            <h2 class="section-heading">Workflow Diagram</h2>
+            <div class="content-card">
+                <div id="mermaid-diagram">
+                    <pre class="mermaid">{{ mermaid_graph_markdown }}</pre>
+                </div>
+            </div>
+            
+            <h2 class="section-heading">Final State</h2>
+            <div class="content-card">
+                <pre>{{ final_state | tojson(indent=2) }}</pre>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@latest/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base',
+            themeVariables: {
+                primaryColor: '#f0f2ff',
+                primaryTextColor: '#3730a3',
+                primaryBorderColor: '#c7d2fe',
+                lineColor: '#a5b4fc'
+            }
+        });
+    </script>
+</body>
+</html>
