@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PPA Agent Workflow: Multi-Turn HITL Quote Flow</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Noto+Serif:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --color-primary: #667eea;
+            --color-secondary: #764ba2;
+            --color-text-base: #343a40;
+            --color-text-muted: #6c757d;
+            --color-bg-light: #f8f9fa;
+            --color-bg-card: #ffffff;
+            --color-border: #dee2e6;
+            --color-accent-customer: #3b82f6; /* blue-500 */
+            --color-accent-agent: #10b981; /* emerald-500 */
+            --color-accent-ai: #8b5cf6; /* violet-500 */
+            --color-accent-system: #64748b; /* slate-500 */
+            --color-accent-review: #f59e0b; /* amber-500 */
+            --color-accent-accept: #22c55e; /* green-500 */
+            --color-accent-reject: #ef4444; /* red-500 */
+            --color-ai-output-bg: #f0f9ff; /* sky-50 */
+            --color-ai-output-border: #bae6fd; /* sky-200 */
+            --color-ai-output-text: #0369a1; /* sky-700 */
+            --color-rejected-bg: #fff1f2; /* rose-50 */
+            --color-rejected-border: #ffcbd0; /* rose-200 */
+            --color-rejected-text: #be123c; /* rose-700 */
+        }
+
+        body {
+            font-family: 'Roboto', Tahoma, Arial, "Droid Sans", "Helvetica Neue", "Droid Sans Fallback", "Heiti SC", "Hiragino Sans GB", Simsun, sans-serif;
+            background-color: var(--color-bg-light);
+            color: var(--color-text-base);
+            line-height: 1.6;
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+            font-family: 'Roboto', sans-serif;
+            font-weight: 700;
+            color: #2c3e50; /* Darker heading color */
+        }
+
+        .serif { font-family: 'Noto Serif', serif; }
+
+        .hero-bg {
+            background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
+            position: relative;
+            overflow: hidden;
+            padding: 5rem 1.5rem; /* Adjusted padding */
+        }
+
+        .floating-element {
+            position: absolute;
+            background-color: rgba(255, 255, 255, 0.08);
+            border-radius: 50%;
+            animation: float 15s infinite ease-in-out alternate;
+            pointer-events: none;
+        }
+        .floating-element:nth-child(1) { width: 80px; height: 80px; top: 10%; left: 15%; animation-duration: 17s; }
+        .floating-element:nth-child(2) { width: 50px; height: 50px; top: 30%; left: 70%; animation-duration: 23s; }
+        .floating-element:nth-child(3) { width: 100px; height: 100px; top: 60%; left: 80%; animation-duration: 13s; }
+        .floating-element:nth-child(4) { width: 60px; height: 60px; top: 80%; left: 20%; animation-duration: 21s; }
+        .floating-element:nth-child(5) { width: 40px; height: 40px; top: 50%; left: 40%; animation-duration: 19s; }
+
+        @keyframes float {
+            0% { transform: translateY(0px) translateX(0px) rotate(0deg) scale(1); }
+            100% { transform: translateY(-25px) translateX(20px) rotate(90deg) scale(1.1); }
+        }
+
+        .wow-effect { transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out; }
+        .wow-effect:hover { transform: translateY(-5px); }
+
+        .content-card {
+            background-color: var(--color-bg-card);
+            border-radius: 12px;
+            box-shadow: 0 8px 15px -3px rgba(0, 0, 0, 0.06), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            transition: box-shadow 0.3s ease-in-out;
+            overflow: hidden;
+            border: 1px solid var(--color-border);
+        }
+        .content-card:hover { box-shadow: 0 15px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -5px rgba(0, 0, 0, 0.04); }
+
+        .email-header, .action-header {
+            background-color: #e9ecef;
+            padding: 10px 16px;
+            border-bottom: 1px solid var(--color-border);
+            font-size: 0.875rem;
+            color: var(--color-text-muted);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .email-body, .action-body { padding: 16px; font-size: 0.95rem; }
+
+        .ai-output-block {
+            background-color: var(--color-ai-output-bg);
+            border: 1px solid var(--color-ai-output-border);
+            color: var(--color-ai-output-text);
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 12px;
+            margin-bottom: 12px;
+            font-size: 0.9rem;
+            white-space: pre-wrap; /* Preserve line breaks in AI output */
+            word-wrap: break-word;
+        }
+         .rejected-output-block {
+            background-color: var(--color-rejected-bg);
+            border: 1px solid var(--color-rejected-border);
+            color: var(--color-rejected-text);
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 12px;
+            margin-bottom: 12px;
+            font-size: 0.9rem;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .state-dump pre {
+            background-color: #282c34;
+            color: #abb2bf;
+            padding: 1rem;
+            border-radius: 8px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.85rem;
+            overflow-x: auto;
+            max-height: 400px;
+            border: 1px solid #444;
+        }
+        details > summary {
+            cursor: pointer;
+            font-weight: 500;
+            color: var(--color-primary);
+            padding: 8px;
+            background-color: #f0f2ff;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+            display: inline-block; /* Prevent summary taking full width */
+        }
+        details > summary:hover { background-color: #e0e7ff; }
+        details[open] > summary { background-color: #e0e7ff; }
+
+        .turn-marker {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+            color: white;
+            font-weight: bold;
+            font-size: 1.1rem;
+            margin-right: 16px;
+            flex-shrink: 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .timeline-connector {
+            width: 3px;
+            background: linear-gradient(to bottom, #cbd5e1, #e2e8f0);
+            margin-left: 18.5px; /* Align with center of turn marker */
+            flex-grow: 1;
+            border-radius: 2px;
+        }
+
+        .mermaid-container {
+            display: block; /* Changed from flex */
+            width: 100%;
+            overflow-x: auto; /* Enable horizontal scroll */
+            padding: 20px 0;
+            background-color: #fdfdff;
+            border-radius: 8px;
+            border: 1px solid #e8eaf6;
+        }
+        .mermaid {
+            display: block; /* Ensure Mermaid itself doesn't try to flex center */
+             margin: 0 auto; /* Center the diagram if it's smaller than container */
+             min-width: 600px; /* Example min-width to prevent excessive shrinking */
+        }
+        .mermaid svg { max-width: none; height: auto; } /* Allow SVG to exceed container for scrolling */
+
+        /* Icons */
+        .icon-customer { color: var(--color-accent-customer); }
+        .icon-agent { color: var(--color-accent-agent); }
+        .icon-ai { color: var(--color-accent-ai); }
+        .icon-system { color: var(--color-accent-system); }
+        .icon-review { color: var(--color-accent-review); }
+        .icon-accept { color: var(--color-accent-accept); }
+        .icon-reject { color: var(--color-accent-reject); }
+
+        .section-heading {
+            position: relative;
+            padding-bottom: 10px;
+            margin-bottom: 28px;
+            font-size: 1.875rem; /* 30px */
+        }
+        .section-heading::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 60px;
+            height: 4px;
+            background: linear-gradient(90deg, var(--color-primary), var(--color-secondary));
+            border-radius: 2px;
+        }
+
+        .human-action {
+             border-left: 4px solid;
+             padding-left: 12px;
+             margin-top: 12px;
+             margin-bottom: 12px;
+        }
+        .action-accept { border-color: var(--color-accent-accept); }
+        .action-reject { border-color: var(--color-accent-reject); }
+
+        .ai-step-block {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem; /* 12px */
+            padding: 0.5rem 0.75rem; /* 8px 12px */
+            border: 1px solid #e5e7eb; /* gray-200 */
+            border-radius: 6px;
+            background-color: #f9fafb; /* gray-50 */
+            margin-bottom: 0.5rem; /* 8px */
+            font-size: 0.9rem;
+        }
+        .ai-step-block i { width: 16px; text-align: center; }
+
+        /* Responsive Adjustments */
+        @media (max-width: 768px) {
+            .flex-col-mobile { flex-direction: column; }
+            .hero-bg { padding: 4rem 1rem; }
+            .hero h1 { font-size: 2rem; }
+            .hero p { font-size: 1rem; }
+            .section-heading { font-size: 1.5rem; } /* 24px */
+            .turn-marker { width: 36px; height: 36px; font-size: 1rem; margin-right: 12px;}
+            .timeline-connector { margin-left: 16.5px; }
+        }
+
+        /* Badge styling */
+        .badge {
+             display: inline-block;
+             padding: 0.2em 0.6em;
+             font-size: 0.75rem;
+             font-weight: 600;
+             line-height: 1;
+             text-align: center;
+             white-space: nowrap;
+             vertical-align: baseline;
+             border-radius: 0.375rem;
+             margin-left: 0.5rem;
+        }
+        .badge-info { background-color: #e0f2fe; color: #0ea5e9; } /* sky-100 / sky-600 */
+        .badge-success { background-color: #dcfce7; color: #16a34a; } /* green-100 / green-600 */
+        .badge-warning { background-color: #fef9c3; color: #ca8a04; } /* yellow-100 / yellow-600 */
+        .badge-error { background-color: #fee2e2; color: #dc2626; } /* red-100 / red-600 */
+        .badge-review { background-color: #ffedd5; color: #f97316; } /* orange-100 / orange-600 */
+        .badge-quote { background-color: #ede9fe; color: #7c3aed; } /* violet-100 / violet-600 */
+        .badge-neutral { background-color: #f1f5f9; color: #475569; } /* slate-100 / slate-600 */
+
+    </style>
+</head>
+<body class="bg-gray-50">
+
+    <!-- Hero Section -->
+    <header class="hero-bg text-white relative">
+        <div class="floating-element"></div>
+        <div class="floating-element"></div>
+        <div class="floating-element"></div>
+        <div class="floating-element"></div>
+        <div class="floating-element"></div>
+        <div class="container mx-auto text-center relative z-10">
+            <h1 class="text-4xl md:text-5xl lg:text-6xl font-bold mb-4 leading-tight">
+                PPA Agent: Multi-Turn HITL Workflow
+            </h1>
+            <p class="text-lg md:text-xl lg:text-2xl mb-8 serif italic max-w-4xl mx-auto">
+                Visualizing a comprehensive integration test demonstrating customer interaction, AI analysis, information gathering, discount handling, quote generation, and multiple Human-in-the-Loop review cycles (including rejection and acceptance).
+            </p>
+            <span class="inline-block bg-white text-indigo-700 font-semibold py-2 px-5 rounded-full shadow-lg text-sm md:text-base">
+                Test Case: `visualize_hitl_v2_flow.py` Simulation
+            </span>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 md:px-6 py-12">
+
+        <!-- System Overview -->
+        <section class="mb-16">
+            <h2 class="section-heading">System Overview</h2>
+            <div class="grid md:grid-cols-2 gap-8 items-start">
+                <div>
+                    <p class="text-gray-700 leading-relaxed mb-4">
+                        This page visualizes the intricate workflow of our AI-powered Personal Private Auto (PPA) insurance agent. Utilizing <strong class="text-purple-600">LangGraph</strong> for state management, the agent engages in multi-turn conversations, extracts data, identifies missing information, handles discount inquiries, generates quotes, and seamlessly integrates human oversight.
+                    </p>
+                    <p class="text-gray-700 leading-relaxed">
+                        The <strong class="text-amber-600">Human-in-the-Loop (HITL)</strong> mechanism is central to this process. Key AI outputs (like analysis, information requests, or generated quotes) trigger pauses in the workflow, requiring review and explicit approval or rejection from an agency representative. This ensures accuracy, compliance, and allows for human judgment in complex scenarios, including handling feedback for AI retries.
+                    </p>
+                </div>
+                <div class="content-card p-4 mt-4 md:mt-0">
+                     <h3 class="text-xl font-semibold mb-3 text-center text-gray-700">High-Level Interaction Flow</h3>
+                     <div class="mermaid-container">
+                         <div class="mermaid">
+graph LR
+    A["<i class='fas fa-user icon-customer'></i> Customer"] -- Email Inquiry --> B{"<i class='fas fa-envelope icon-system'></i> Intake"};
+    B -- Pass to AI --> C["<i class='fas fa-robot icon-ai'></i> AI Agent (LangGraph)"];
+    C -- Analyze & Action --> D{"<i class='fas fa-pause-circle icon-review'></i> HITL Review Point?"};
+    D -- Yes --> E["<i class='fas fa-user-tie icon-agent'></i> Agency Review"];
+    E -- Approve/Reject --> C;
+    D -- No --> F["<i class='fas fa-paper-plane icon-system'></i> Prepare Response"];
+    C -- Final Output --> F;
+    F -- To Customer/Internal --> G["<i class='fas fa-check-circle icon-system'></i> Outcome"];
+
+ classDef default fill:#f9fafb,stroke:#e5e7eb,stroke-width:1px,color:#374151;
+ style A,B,C,D,E,F,G fill:none,stroke:none;
+                         </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Integration Test Walkthrough -->
+        <section class="mb-16">
+            <h2 class="section-heading">Detailed Workflow Walkthrough</h2>
+            <p class="text-gray-700 leading-relaxed mb-8">
+                Follow the step-by-step execution of the agent based on the `visualize_hitl_v2_flow.py` simulation log. This demonstrates the complete cycle from initial contact to the final approved quote.
+            </p>
+
+            <!-- Timeline Structure -->
+            <div class="space-y-8">
+
+                <!-- Turn 1: Customer Inquiry & AI Analysis -->
+                <div class="flex">
+                    <div class="turn-marker">1</div>
+                    <div class="flex-1">
+                        <h3 class="text-2xl font-semibold mb-4 text-indigo-700">Turn 1: Customer Inquiry & Initial Analysis <span class="badge badge-review">HITL 1 Triggered</span></h3>
+                        <div class="grid md:grid-cols-2 gap-6">
+                            <!-- Customer Email -->
+                            <div class="content-card wow-effect">
+                                <div class="email-header"><i class="fas fa-envelope icon-customer"></i> <strong>From:</strong> Customer</div>
+                                <div class="email-body">
+                                    <p>"Hi, I'd like a quote for my car. It's a Toyota Camry."</p>
+                                    <em class="text-sm text-gray-500 block mt-4">Timestamp: 2025-04-16T09:50:47.881777</em>
+                                </div>
+                            </div>
+                            <!-- AI Processing -->
+                            <div class="content-card wow-effect">
+                                 <div class="action-header"><i class="fas fa-cogs icon-ai"></i> <strong>AI Agent Processing</strong></div>
+                                <div class="action-body">
+                                    <p class="mb-3 text-gray-700">AI processes the email:</p>
+                                    <div class="space-y-2 mb-3">
+                                        <div class="ai-step-block"><i class="fas fa-check-circle text-green-500"></i> Identifies Intent: `new_business`, LoB: `PPA`</div>
+                                        <div class="ai-step-block"><i class="fas fa-search text-blue-500"></i> Extracts: `Toyota Camry`</div>
+                                        <div class="ai-step-block"><i class="fas fa-exclamation-circle text-red-500"></i> Finds Missing: `driver_name`, `driver_age`, `vehicle_year`, `address`</div>
+                                        <div class="ai-step-block"><i class="fas fa-tasks text-purple-500"></i> Generates Info Request Email (Draft below)</div>
+                                        <div class="ai-step-block"><i class="fas fa-flag text-amber-500"></i> Sets Status: `info_incomplete`</div>
+                                    </div>
+
+                                    <h4 class="text-sm font-semibold text-gray-600 mt-4 mb-1">Generated Info Request (for Review):</h4>
+                                    <div class="ai-output-block">
+                                        Thank you for your interest in a Personal Private Auto quote for your Toyota Camry. To proceed and provide you with an accurate quote, could you please share the following details:
+                                        <ul>
+                                            <li>*   Your full name</li>
+                                            <li>*   Your age</li>
+                                            <li>*   The year of your Camry</li>
+                                            <li>*   Your full address</li>
+                                        </ul>
+                                    </div>
+
+                                    <p class="font-semibold text-amber-700 flex items-center gap-2 my-3">
+                                        <i class="fas fa-pause-circle icon-review"></i> Workflow Paused for Agency Review
+                                    </p>
+                                    <details>
+                                        <summary class="text-sm">Show State Snapshot (End of Turn 1)</summary>
+                                        <div class="state-dump mt-2">
+                                            <pre><code class="language-json">{
+  "thread_id": "a28bc16616064b18b558d2479a98dd7e",
+  "customer_email": "Hi, I'd like a quote for my car. It's a Toyota Camry.",
+  "email_thread": [{ "role": "customer", "content": "...", "timestamp": "..." }],
+  "customer_info": { "vehicle_make": "Toyota", "vehicle_model": "Camry", ... },
+  "missing_info": ["driver_name", "driver_age", "vehicle_year", "address"],
+  "status": "info_incomplete",
+  "messages": [{ "role": "agent", "content": "Thank you for your interest...", "type": "info_request", "requires_review": true }],
+  "step_requiring_review": "generate_info_request",
+  "data_for_review": { "review_target": "generate_info_request", "generated_info_request_message": "...", ... },
+  "last_human_decision_for_step": {},
+  "retry_counts": { "analyze_information": 0, "generate_info_request": 0 }
+}</code></pre>
+                                        </div>
+                                    </details>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Connector -->
+                <div class="flex h-8"><div class="timeline-connector"></div></div>
+
+                <!-- Turn 2: Agency Accepts Info Request -->
+                <div class="flex">
+                    <div class="turn-marker">2</div>
+                    <div class="flex-1">
+                        <h3 class="text-2xl font-semibold mb-4 text-indigo-700">Turn 2: Agency Accepts Info Request <span class="badge badge-success">HITL 1 Resolved</span></h3>
+                        <div class="grid md:grid-cols-2 gap-6">
+                             <!-- Agency Action -->
+                           <div class="content-card wow-effect">
+                               <div class="action-header"><i class="fas fa-user-tie icon-agent"></i> <strong>Agency Action</strong></div>
+                               <div class="action-body human-action action-accept">
+                                   <p class="text-gray-700 flex items-center gap-2">
+                                       <i class="fas fa-check-circle icon-accept text-xl"></i>
+                                       Agency representative reviews and <strong class="text-green-600">accepts</strong> the AI-generated info request email.
+                                   </p>
+                               </div>
+                           </div>
+                           <!-- Email Sent -->
+                           <div class="content-card wow-effect">
+                               <div class="email-header"><i class="fas fa-paper-plane icon-system"></i> <strong>Email Sent to Customer</strong></div>
+                               <div class="email-body">
+                                    <p>Thank you for your interest in a Personal Private Auto quote for your Toyota Camry. To proceed and provide you with an accurate quote, could you please share the following details:</p>
+                                    <ul class="list-disc list-inside my-2 ml-4 text-sm">
+                                        <li>Your full name</li>
+                                        <li>Your age</li>
+                                        <li>The year of your Camry</li>
+                                        <li>Your full address</li>
+                                    </ul>
+                                    <em class="text-sm text-gray-500 block mt-3">Timestamp: 2025-04-16T09:51:06.731378 (Simulated Send)</em>
+                               </div>
+                           </div>
+                       </div>
+                       <!-- AI State Update -->
+                       <div class="content-card wow-effect mt-6">
+                           <div class="action-header"><i class="fas fa-cogs icon-ai"></i> <strong>AI Agent Final State (Turn 2)</strong></div>
+                           <div class="action-body">
+                               <p class="mb-2 text-gray-700">The workflow updates the state after acceptance:</p>
+                               <div class="space-y-2 mb-3">
+                                   <div class="ai-step-block"><i class="fas fa-history text-gray-500"></i> Recorded Decision: `generate_info_request` = `accepted`.</div>
+                                   <div class="ai-step-block"><i class="fas fa-hourglass-half text-purple-500"></i> Status updated to: `info_requested`.</div>
+                                   <div class="ai-step-block"><i class="fas fa-lock text-gray-500"></i> `step_requiring_review` cleared. Waiting for customer.</div>
+                               </div>
+                               <details>
+                                   <summary class="text-sm">Show State Snapshot (End of Turn 2)</summary>
+                                   <div class="state-dump mt-2">
+                                       <pre><code class="language-json">{
+  // ... state fields ...
+  "status": "info_requested",
+  "messages": [{ "role": "agent", "content": "Thank you for your interest...", "type": "info_request", "timestamp": "...", "requires_review": false }],
+  "step_requiring_review": null,
+  "last_human_decision_for_step": { "generate_info_request": "accepted" },
+  // ... other fields ...
+}</code></pre>
+                                   </div>
+                               </details>
+                           </div>
+                       </div>
+                   </div>
+               </div>
+
+               <!-- Connector -->
+               <div class="flex h-8"><div class="timeline-connector"></div></div>
+
+               <!-- Turn 3: Customer Reply & AI Processing -->
+               <div class="flex">
+                   <div class="turn-marker">3</div>
+                   <div class="flex-1">
+                       <h3 class="text-2xl font-semibold mb-4 text-indigo-700">Turn 3: Customer Provides Info & Asks Question</h3>
+                       <div class="grid md:grid-cols-2 gap-6">
+                           <!-- Customer Email -->
+                           <div class="content-card wow-effect">
+                               <div class="email-header"><i class="fas fa-envelope icon-customer"></i> <strong>From:</strong> Customer</div>
+                               <div class="email-body">
+                                   <p>"Okay, here is the info:<br>Name: Bob Smith<br>Age: 35<br>Vehicle Year: 2022<br>Address: 123 Main St, Anytown, CA 90210<br>Also, I have a good student discount proof, how can I provide it?"</p>
+                                   <em class="text-sm text-gray-500 block mt-4">Timestamp: 2025-04-16T09:51:06.731611</em>
+                               </div>
+                           </div>
+                           <!-- AI Processing -->
+                           <div class="content-card wow-effect">
+                               <div class="action-header"><i class="fas fa-cogs icon-ai"></i> <strong>AI Agent Processing</strong></div>
+                               <div class="action-body">
+                                   <p class="mb-3 text-gray-700">AI processes the reply:</p>
+                                   <div class="space-y-2 mb-3">
+                                       <div class="ai-step-block"><i class="fas fa-check-circle text-green-500"></i> Intent: `provide_info`</div>
+                                       <div class="ai-step-block"><i class="fas fa-user-edit text-blue-500"></i> Updates `customer_info` (Name, Age, Year, Address).</div>
+                                       <div class="ai-step-block"><i class="fas fa-list-check text-green-500"></i> `missing_info` becomes empty.</div>
+                                       <div class="ai-step-block"><i class="fas fa-question-circle text-orange-500"></i> Detects `customer_question`: "how can I provide it?"</div>
+                                       <div class="ai-step-block"><i class="fas fa-tags text-blue-500"></i> Checks for potential discounts (finds Good Student).</div>
+                                       <div class="ai-step-block"><i class="fas fa-exclamation-triangle text-amber-500"></i> `discount_status`: `proof_needed`. Generates internal query (below).</div>
+                                       <div class="ai-step-block"><i class="fas fa-pause text-purple-500"></i> Sets Status: `question_asked`. Ends turn.</div>
+                                   </div>
+
+                                   <h4 class="text-sm font-semibold text-gray-600 mt-4 mb-1">Generated Discount Query (Internal/Requires Review):</h4>
+                                   <div class="ai-output-block">
+                                        To apply the Good Student Discount, please provide the necessary proof (e.g., recent report card or enrollment verification).
+                                   </div>
+
+                                   <p class="text-sm text-gray-600 mt-3">Agent ends the turn here because the customer asked a question, pausing further actions like sending the discount query.</p>
+                                   <details class="mt-3">
+                                       <summary class="text-sm">Show State Snapshot (End of Turn 3)</summary>
+                                       <div class="state-dump mt-2">
+                                           <pre><code class="language-json">{
+  // ... email_thread updated ...
+  "customer_info": { "driver_name": "Bob Smith", "driver_age": "35", "vehicle_year": "2022", ... },
+  "missing_info": [],
+  "status": "question_asked",
+  "discount_status": "proof_needed",
+  "customer_question": "how can I provide it?",
+  "messages": [{ "role": "agent", "content": "To apply the Good Student Discount...", "type": "discount_query", "requires_review": true }],
+  "step_requiring_review": null,
+  // ... other fields ...
+}</code></pre>
+                                       </div>
+                                   </details>
+                               </div>
+                           </div>
+                       </div>
+                   </div>
+               </div>
+
+               <!-- Connector -->
+               <div class="flex h-8"><div class="timeline-connector"></div></div>
+
+               <!-- Turn 4: Customer Provides Proof & AI Generates Quote -->
+               <div class="flex">
+                   <div class="turn-marker">4</div>
+                   <div class="flex-1">
+                       <h3 class="text-2xl font-semibold mb-4 text-indigo-700">Turn 4: Customer Provides Proof & AI Generates Quote <span class="badge badge-review">HITL 2 Triggered</span></h3>
+                       <div class="grid md:grid-cols-2 gap-6">
+                           <!-- Customer Email -->
+                           <div class="content-card wow-effect">
+                               <div class="email-header"><i class="fas fa-envelope icon-customer"></i> <strong>From:</strong> Customer</div>
+                               <div class="email-body">
+                                   <p>"Here is the attached proof of my good student discount."</p>
+                                   <em class="text-sm text-gray-500 block mt-4">(Attachment handling simulated) Timestamp: 2025-04-16T09:51:37.455538</em>
+                               </div>
+                           </div>
+                           <!-- AI Processing -->
+                           <div class="content-card wow-effect">
+                               <div class="action-header"><i class="fas fa-cogs icon-ai"></i> <strong>AI Agent Processing</strong></div>
+                               <div class="action-body">
+                                   <p class="mb-3 text-gray-700">AI processes the confirmation:</p>
+                                    <div class="space-y-2 mb-3">
+                                       <div class="ai-step-block"><i class="fas fa-check-circle text-green-500"></i> Intent: `provide_info`.</div>
+                                       <div class="ai-step-block"><i class="fas fa-file-alt text-blue-500"></i> Notes proof provided (ideally sets `proof_of_discount` to `True`).</div>
+                                       <div class="ai-step-block"><i class="fas fa-list-check text-green-500"></i> Information remains complete.</div>
+                                       <div class="ai-step-block"><i class="fas fa-calculator text-purple-500"></i> Proceeds to `generate_quote` node.</div>
+                                       <div class="ai-step-block"><i class="fas fa-file-invoice-dollar text-green-500"></i> Generates Quote & Draft Email (below).</div>
+                                       <div class="ai-step-block"><i class="fas fa-flag text-amber-500"></i> Sets Status: `quote_generated`.</div>
+                                   </div>
+
+                                   <h4 class="text-sm font-semibold text-gray-600 mt-4 mb-1">Generated Quote Email (for Review):</h4>
+                                   <div class="ai-output-block">
+                                       Great news! We've generated a preliminary quote for your N/A N/A N/A. Your estimated annual premium is $1,200.50. This quote includes standard coverages (Bodily Injury: 100k/300k, Property Damage: 50k, Collision Deductible: $500, Comprehensive Deductible: $250). Please let us know if you'd like to adjust coverages or proceed.
+                                       <br><em>(Note: Dummy data used in placeholder logic)</em>
+                                   </div>
+
+                                   <p class="font-semibold text-amber-700 flex items-center gap-2 my-3">
+                                       <i class="fas fa-pause-circle icon-review"></i> Workflow Paused for Agency Review
+                                   </p>
+                                   <details>
+                                       <summary class="text-sm">Show State Snapshot (End of Turn 4)</summary>
+                                       <div class="state-dump mt-2">
+                                           <pre><code class="language-json">{
+  // ... email_thread updated ...
+  "status": "quote_generated",
+  "quote_ready": true,
+  "quote_data": { "policy_number": "PPA-90499", "premium_annual": 1200.50, "message": "Great news! ...", ... },
+  "discount_status": "proof_needed", // Ideally updated based on processing proof
+  "messages": [ ..., { "role": "agent", "content": "Great news! ...", "type": "quote_generated", "requires_review": false } ], // Placeholder added message
+  "step_requiring_review": "generate_quote",
+  "data_for_review": { "review_target": "generate_quote", "generated_quote_details": { ... quote_data ... }, ... },
+  // ... other fields ...
+}</code></pre>
+                                       </div>
+                                   </details>
+                               </div>
+                           </div>
+                       </div>
+                   </div>
+               </div>
+
+               <!-- Connector -->
+               <div class="flex h-8"><div class="timeline-connector"></div></div>
+
+               <!-- Turn 5: Agency Rejects Quote -->
+                <div class="flex">
+                   <div class="turn-marker">5</div>
+                   <div class="flex-1">
+                       <h3 class="text-2xl font-semibold mb-4 text-indigo-700">Turn 5: Agency Rejects Quote & AI Retries <span class="badge badge-error">HITL 2 Resolved (Rejected)</span> <span class="badge badge-review">HITL 3 Triggered</span></h3>
+                       <div class="grid md:grid-cols-2 gap-6">
+                            <!-- Agency Action -->
+                           <div class="content-card wow-effect">
+                               <div class="action-header"><i class="fas fa-user-tie icon-agent"></i> <strong>Agency Action</strong></div>
+                               <div class="action-body">
+                                    <h4 class="text-sm font-semibold text-gray-600 mb-1">Rejected Quote Content:</h4>
+                                    <div class="rejected-output-block mb-3">
+                                        Great news! We've generated a preliminary quote... [Original Quote Text as generated in Turn 4] ...$1,200.50... (Bodily Injury: 100k/300k, Property Damage: 50k)...
+                                    </div>
+                                    <div class="human-action action-reject">
+                                        <p class="text-gray-700 flex items-start gap-2">
+                                            <i class="fas fa-times-circle icon-reject text-xl mt-1"></i>
+                                            <div>
+                                                Agency representative <strong class="text-red-600">rejects</strong> the quote.
+                                                <br>
+                                                <span class="text-sm text-gray-500">Feedback: <em class="text-gray-700">"Liability limits seem too low, please increase to 100/300."</em></span>
+                                            </div>
+                                        </p>
+                                   </div>
+                               </div>
+                           </div>
+                            <!-- AI Retries -->
+                           <div class="content-card wow-effect">
+                               <div class="action-header"><i class="fas fa-history icon-ai"></i> <strong>AI Agent Retries Generation</strong></div>
+                               <div class="action-body">
+                                   <p class="mb-3 text-gray-700">Workflow resumes based on rejection:</p>
+                                   <div class="space-y-2 mb-3">
+                                       <div class="ai-step-block"><i class="fas fa-undo text-blue-500"></i> Re-enters `generate_quote` node.</div>
+                                       <div class="ai-step-block"><i class="fas fa-comment-dots text-purple-500"></i> Incorporates feedback: "Liability limits seem too low..."</div>
+                                       <div class="ai-step-block"><i class="fas fa-redo text-green-500"></i> Re-generates quote & draft email (below).</div>
+                                       <div class="ai-step-block"><i class="fas fa-flag text-amber-500"></i> Status remains: `quote_generated`.</div>
+                                   </div>
+
+                                   <h4 class="text-sm font-semibold text-gray-600 mt-4 mb-1">Revised Quote Email (for Review):</h4>
+                                   <div class="ai-output-block">
+                                       (Revised based on feedback: Liability limits seem too low, please increase to 100/300.)
+                                       <br><br>
+                                       Great news! We've generated a preliminary quote for your N/A N/A N/A. Your estimated annual premium is $1,200.50. This quote includes standard coverages (Bodily Injury: 100k/300k, Property Damage: 50k, Collision Deductible: $500, Comprehensive Deductible: $250). Please let us know if you'd like to adjust coverages or proceed.
+                                       <br><em>(Note: Dummy data used)</em>
+                                   </div>
+
+                                    <p class="font-semibold text-amber-700 flex items-center gap-2 my-3">
+                                       <i class="fas fa-pause-circle icon-review"></i> Workflow Paused for Agency Review (Again)
+                                   </p>
+                                    <details>
+                                        <summary class="text-sm">Show State Snapshot (End of Turn 5)</summary>
+                                        <div class="state-dump mt-2">
+                                            <pre><code class="language-json">{
+  // ... state fields ...
+  "status": "quote_generated",
+  "quote_data": { ... "message": "(Revised based on feedback...)..." },
+  "rejection_feedback_for_step": { "generate_quote": "Liability limits seem too low..." },
+  "retry_counts": { "generate_quote": 1 }, // Updated
+  "step_requiring_review": "generate_quote", // Paused again
+  "data_for_review": { "review_target": "generate_quote", "generated_quote_details": { ... revised quote ... }, ... },
+  // ... other fields ...
+}</code></pre>
+                                        </div>
+                                    </details>
+                               </div>
+                           </div>
+                       </div>
+                   </div>
+               </div>
+
+               <!-- Connector -->
+               <div class="flex h-8"><div class="timeline-connector"></div></div>
+
+               <!-- Turn 6: Agency Accepts Revised Quote -->
+                <div class="flex">
+                   <div class="turn-marker">6</div>
+                   <div class="flex-1">
+                       <h3 class="text-2xl font-semibold mb-4 text-indigo-700">Turn 6: Agency Accepts Revised Quote <span class="badge badge-success">HITL 3 Resolved</span></h3>
+                       <div class="grid md:grid-cols-2 gap-6">
+                           <!-- Agency Action -->
+                           <div class="content-card wow-effect">
+                               <div class="action-header"><i class="fas fa-user-tie icon-agent"></i> <strong>Agency Action</strong></div>
+                               <div class="action-body human-action action-accept">
+                                   <p class="text-gray-700 flex items-center gap-2">
+                                       <i class="fas fa-check-circle icon-accept text-xl"></i>
+                                       Agency representative reviews and <strong class="text-green-600">accepts</strong> the revised quote.
+                                   </p>
+                               </div>
+                           </div>
+                           <!-- AI State Update -->
+                           <div class="content-card wow-effect">
+                               <div class="action-header"><i class="fas fa-cogs icon-ai"></i> <strong>AI Agent Final State (Turn 6)</strong></div>
+                               <div class="action-body">
+                                   <p class="mb-2 text-gray-700">Workflow resumes and concludes:</p>
+                                   <div class="space-y-2 mb-3">
+                                       <div class="ai-step-block"><i class="fas fa-history text-gray-500"></i> Recorded Decision: `generate_quote` = `accepted`.</div>
+                                       <div class="ai-step-block"><i class="fas fa-flag-checkered text-green-500"></i> Final Status remains `quote_generated`.</div>
+                                        <div class="ai-step-block"><i class="fas fa-lock text-gray-500"></i> `step_requiring_review` cleared.</div>
+                                        <div class="ai-step-block"><i class="fas fa-check-double text-green-500"></i> Workflow complete. Ready to send final quote.</div>
+                                   </div>
+                                   <details>
+                                        <summary class="text-sm">Show State Snapshot (End of Turn 6 - Final)</summary>
+                                        <div class="state-dump mt-2">
+                                            <pre><code class="language-json">{
+  // ... state fields ...
+  "status": "quote_generated",
+  "quote_data": { ... revised quote ... },
+  "messages": [ ..., { "role": "agent", "content": "(Revised based on feedback...)", "type": "quote_generated", "requires_review": false } ],
+  "step_requiring_review": null,
+  "last_human_decision_for_step": { "generate_quote": "accepted" },
+  "retry_counts": { "generate_quote": 1 },
+  // ... other fields ...
+}</code></pre>
+                                        </div>
+                                    </details>
+                               </div>
+                           </div>
+                       </div>
+                   </div>
+               </div>
+
+               <!-- Connector -->
+               <div class="flex h-8"><div class="timeline-connector"></div></div>
+
+               <!-- Turn 7: Simulation of Sending Quote -->
+                <div class="flex">
+                   <div class="turn-marker">7</div>
+                   <div class="flex-1">
+                       <h3 class="text-2xl font-semibold mb-4 text-indigo-700">Turn 7: Final Approved Quote Sent <span class="badge badge-neutral">System Action</span></h3>
+                       <div class="content-card wow-effect">
+                            <div class="email-header"><i class="fas fa-paper-plane icon-system"></i> <strong>Email Sent to Customer</strong></div>
+                            <div class="email-body">
+                                <p>(Revised based on feedback: Liability limits seem too low, please increase to 100/300.)</p>
+                                <p class="mt-2">Great news! We've generated a preliminary quote for your Toyota Camry. Your estimated annual premium is $1,200.50. This quote includes standard coverages (Bodily Injury: 100k/300k, Property Damage: 50k, Collision Deductible: $500, Comprehensive Deductible: $250). Please let us know if you'd like to adjust coverages or proceed.</p>
+                                <em class="text-sm text-gray-500 block mt-3">Timestamp: ~Turn 7 (Simulated Send Time)</em>
+                            </div>
+                       </div>
+                        <p class="text-lg font-semibold text-green-600 mt-6 text-center"><i class="fas fa-check-circle mr-2"></i>Workflow Completed Successfully!</p>
+                   </div>
+               </div>
+
+            </div> <!-- End Timeline -->
+        </section>
+
+        <!-- LangGraph Workflow -->
+        <section class="mb-16">
+             <h2 class="section-heading">LangGraph Workflow & State</h2>
+             <div class="grid md:grid-cols-5 gap-8">
+                 <div class="md:col-span-3 content-card p-4">
+                    <h3 class="text-xl font-semibold mb-3 text-center text-gray-700">Agent Workflow Graph (Execution Path)</h3>
+                    <p class="text-sm text-center text-gray-600 mb-4">This graph shows the specific nodes executed in this simulation.</p>
+                     <div class="mermaid-container">
+                         <div class="mermaid">
+graph LR
+    A(Start) --> B(identify_intention_node);
+    B -- new_business --> C(identify_lob_node);
+    C -- PPA --> D(analyze_information);
+    D -- info_incomplete --> E(generate_info_request):::hitlNode;
+    E -- review_accepted --> F(process_customer_response_node);
+    F -- question_asked --> G(check_for_discounts):::endTurnNode;
+    G -- waits --> H(process_customer_response_node);
+    H -- info_complete --> I(check_for_discounts);
+    I -- proof_needed --> J(generate_quote):::hitlNode;
+    J -- review_rejected --> K(generate_quote):::hitlNode;
+    K -- review_accepted --> L(End - Quote Accepted):::endNode;
+
+    classDef default fill:#f8f9fa,stroke:#dee2e6,stroke-width:1px,color:#495057,font-size:11px,padding:5px;
+    classDef hitlNode fill:#fffbeb,stroke:#fcd34d,stroke-width:2px,color:#b45309,font-weight:bold;
+    classDef endTurnNode fill:#f3e8ff,stroke:#c084fc,stroke-width:2px,color:#7e22ce;
+    classDef endNode fill:#bfdbfe,stroke:#93c5fd,stroke-width:2px,color:#1e40af,font-weight:bold;
+
+    style A fill:#d1fae5,stroke:#6ee7b7,stroke-width:2px,color:#065f46;
+
+                         </div>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-4">
+                        <strong>Note:</strong> Represents the execution path for this specific multi-turn test run based on the log. Nodes styled indicate HITL pauses, end-of-turn pauses, or final states.
+                    </p>
+                 </div>
+
+                 <div class="md:col-span-2 content-card p-4">
+                     <h3 class="text-xl font-semibold mb-3 text-center text-gray-700">Key State Changes Summary</h3>
+                     <div class="space-y-3 text-sm">
+                         <div>
+                             <h4 class="font-medium text-indigo-600">Turn 1:</h4>
+                             <ul class="list-disc list-inside pl-4 text-gray-600">
+                                 <li>`status`: `info_incomplete`</li>
+                                 <li>`step_requiring_review`: `generate_info_request`</li>
+                             </ul>
+                         </div>
+                          <div>
+                             <h4 class="font-medium text-indigo-600">Turn 2 (After Accept):</h4>
+                             <ul class="list-disc list-inside pl-4 text-gray-600">
+                                 <li>`status`: `info_requested`</li>
+                                 <li>`step_requiring_review`: `null`</li>
+                             </ul>
+                         </div>
+                         <div>
+                             <h4 class="font-medium text-indigo-600">Turn 3:</h4>
+                              <ul class="list-disc list-inside pl-4 text-gray-600">
+                                 <li>`customer_info`: Updated.</li>
+                                 <li>`status`: `question_asked`</li>
+                                 <li>`discount_status`: `proof_needed`</li>
+                             </ul>
+                         </div>
+                          <div>
+                             <h4 class="font-medium text-indigo-600">Turn 4:</h4>
+                              <ul class="list-disc list-inside pl-4 text-gray-600">
+                                 <li>`status`: `quote_generated`</li>
+                                 <li>`quote_ready`: `true`</li>
+                                 <li>`step_requiring_review`: `generate_quote`</li>
+                             </ul>
+                         </div>
+                           <div>
+                             <h4 class="font-medium text-indigo-600">Turn 5 (After Reject):</h4>
+                              <ul class="list-disc list-inside pl-4 text-gray-600">
+                                 <li>`step_requiring_review`: `generate_quote` (again)</li>
+                                 <li>`retry_counts` incremented.</li>
+                              </ul>
+                         </div>
+                         <div>
+                             <h4 class="font-medium text-indigo-600">Turn 6 (Final):</h4>
+                              <ul class="list-disc list-inside pl-4 text-gray-600">
+                                 <li>`status`: `quote_generated`</li>
+                                 <li>`step_requiring_review`: `null`</li>
+                                 <li>`last_human_decision...`: `accepted`</li>
+                             </ul>
+                         </div>
+                     </div>
+                 </div>
+             </div>
+        </section>
+
+         <!-- Further Reading -->
+         <section>
+             <h2 class="section-heading">Further Reading & Exploration</h2>
+             <p class="text-gray-700 leading-relaxed mb-6">
+                 To delve deeper into the concepts behind building sophisticated, human-in-the-loop AI agents, explore these resources:
+             </p>
+             <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                 <!-- Further reading cards remain the same as previous version -->
+                 <div class="content-card p-6 wow-effect flex flex-col justify-between">
+                    <div>
+                        <h4 class="font-semibold text-lg mb-2 text-indigo-800">LangChain & LangGraph Docs</h4>
+                        <p class="text-gray-600 text-sm mb-3">The core frameworks enabling this agent's state management and LLM interactions.</p>
+                    </div>
+                    <a href="https://python.langchain.com/docs/langgraph" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:text-indigo-800 font-medium inline-flex items-center mt-2 text-sm">LangGraph Docs <i class="fas fa-arrow-right ml-1 text-xs"></i></a>
+                 </div>
+                  <div class="content-card p-6 wow-effect flex flex-col justify-between">
+                    <div>
+                        <h4 class="font-semibold text-lg mb-2 text-indigo-800">Designing Agentic Systems</h4>
+                        <p class="text-gray-600 text-sm mb-3">Patterns and principles for building reliable AI agents, covering state, tools, and memory.</p>
+                    </div>
+                     <a href="https://lilianweng.github.io/posts/2023-06-23-agent/" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:text-indigo-800 font-medium inline-flex items-center mt-2 text-sm">Lilian Weng's Blog <i class="fas fa-arrow-right ml-1 text-xs"></i></a>
+                 </div>
+                  <div class="content-card p-6 wow-effect flex flex-col justify-between">
+                    <div>
+                        <h4 class="font-semibold text-lg mb-2 text-indigo-800">Human-in-the-Loop ML</h4>
+                        <p class="text-gray-600 text-sm mb-3">Understanding the critical role and implementation of human feedback in machine learning systems.</p>
+                    </div>
+                     <a href="https://snorkel.ai/human-in-the-loop/" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:text-indigo-800 font-medium inline-flex items-center mt-2 text-sm">Snorkel AI Overview <i class="fas fa-arrow-right ml-1 text-xs"></i></a>
+                 </div>
+                  <div class="content-card p-6 wow-effect flex flex-col justify-between">
+                    <div>
+                        <h4 class="font-semibold text-lg mb-2 text-indigo-800">Building LLM applications</h4>
+                        <p class="text-gray-600 text-sm mb-3">Best practices for developing robust and effective applications powered by Large Language Models.</p>
+                    </div>
+                     <a href="https://www.deeplearning.ai/short-courses/building-llm-apps/" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:text-indigo-800 font-medium inline-flex items-center mt-2 text-sm">DeepLearning.AI Course <i class="fas fa-arrow-right ml-1 text-xs"></i></a>
+                 </div>
+                 <div class="content-card p-6 wow-effect flex flex-col justify-between">
+                    <div>
+                        <h4 class="font-semibold text-lg mb-2 text-indigo-800">Prompt Engineering Guide</h4>
+                        <p class="text-gray-600 text-sm mb-3">Mastering the art of crafting effective prompts to guide LLMs towards desired outcomes.</p>
+                    </div>
+                    <a href="https://www.promptingguide.ai/" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:text-indigo-800 font-medium inline-flex items-center mt-2 text-sm">PromptingGuide.ai <i class="fas fa-arrow-right ml-1 text-xs"></i></a>
+                 </div>
+                 <div class="content-card p-6 wow-effect flex flex-col justify-between">
+                    <div>
+                        <h4 class="font-semibold text-lg mb-2 text-indigo-800">Google AI Gemini API</h4>
+                        <p class="text-gray-600 text-sm mb-3">Documentation for the Gemini models used in this agent's backend.</p>
+                    </div>
+                     <a href="https://ai.google.dev/docs" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:text-indigo-800 font-medium inline-flex items-center mt-2 text-sm">Google AI Docs <i class="fas fa-arrow-right ml-1 text-xs"></i></a>
+                 </div>
+             </div>
+         </section>
+
+    </main>
+
+    <footer class="text-center py-6 bg-gray-200 text-gray-600 text-sm mt-16 border-t border-gray-300">
+        PPA Agent Visualization | Generated: <span id="generation-time"></span>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@latest/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base', // Using 'base' for better customization control
+            themeVariables: {
+                primaryColor: '#f0f2ff', // Light indigo background for nodes
+                primaryTextColor: '#3730a3', // Dark indigo text
+                primaryBorderColor: '#c7d2fe', // Lighter indigo border
+                lineColor: '#a5b4fc', // Medium indigo lines
+                secondaryColor: '#dcfce7', // Light green for secondary states
+                tertiaryColor: '#ffedd5', // Light orange for tertiary/HITL
+                fontSize: '12px',
+                // Specific node type colors
+                nodeBorder: '#a5b4fc',
+                 // HITL node styles (example)
+                clusterBkg: '#fffbeb', // Light yellow for cluster/HITL background
+                clusterBorder: '#fcd34d', // Amber border
+                // End node style (example)
+                nodeTextColor: '#1e40af' // Dark blue text for end node
+            },
+            flowchart: {
+                curve: 'basis', // Smoother curves
+                padding: 15 // Add padding within flowchart
+            },
+            // Security level set to loose to allow fontawesome icons (ensure safety context)
+            securityLevel: 'loose',
+        });
+
+        // Set generation time
+        document.getElementById('generation-time').textContent = new Date().toLocaleString();
+
+    </script>
+
+</body>
+</html>
