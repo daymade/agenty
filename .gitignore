@@ -42,7 +42,18 @@ venv.bak/
 # Project specific
 .env
 logs/
-*.log visualizations/
+*.log
+
+# Visualization outputs
+visualizations/*.html
+visualizations/*.json
+visualizations/0416/
+visualizations/code*
+# Keep visualization templates
+!templates/
 
 # Test Outputs
 test_outputs/
+
+# windsurf rules
+.windsurfrules
