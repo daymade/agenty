@@ -1,11 +1,11 @@
 {
-  "thread_id": "d997767c598b4c6895e4871b8c9396ce",
+  "thread_id": "decc2bf969214feeab83630594d0bbc8",
   "customer_email": "\n        Hi, I'm interested in getting homeowners insurance for my new house.\n        Can you help me with that?\n        ",
   "email_thread": [
     {
       "role": "customer",
       "content": "\n        Hi, I'm interested in getting homeowners insurance for my new house.\n        Can you help me with that?\n        ",
-      "timestamp": "2025-04-15T04:59:04.619864"
+      "timestamp": "2025-04-16T02:09:56.264315"
     }
   ],
   "customer_info": {},
@@ -23,6 +23,7 @@
   "proof_of_discount": null,
   "messages": [],
   "requires_review": false,
+  "review_outcome": null,
   "intent": "new_business",
   "lob": "HOME",
   "status": "new",

@@ -2,14 +2,14 @@
     <!DOCTYPE html>
     <html>
     <head>
-        <title>PPA Agent Result - Complete Info</title>
+        <title>PPA Agent Result - Non Ppa</title>
         <meta charset="UTF-8">
         <style>
             body {
                 font-family: system-ui, -apple-system, sans-serif;
                 margin: 0;
                 padding: 20px;
-                background-color: #f5f5f5;
+                background-color: #f0f2f5;
             }
             .main-container {
                 max-width: 1800px;
@@ -18,6 +18,8 @@
                 padding: 20px;
                 border-radius: 8px;
                 box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                max-height: 600px;
+                overflow: auto;
             }
             .section {
                 margin-bottom: 30px;
@@ -101,19 +103,32 @@
                 background-color: #e2e3e5;
                 color: #383d41;
             }
+            .conversation-turn { margin-bottom: 15px; }
+            .conversation-turn h4 { margin-bottom: 5px; color: #444; font-size: 1.1em; }
+            .conversation-turn pre { white-space: pre-wrap; word-wrap: break-word; background: #f9f9f9; padding: 10px; border: 1px solid #eee; border-radius: 4px; font-size: 0.95em; color: #333; }
+            .customer-turn h4 { color: #0056b3; }
+            .agent-turn h4 { color: #28a745; }
+            .customer-turn pre { background: #e7f3ff; border-color: #cce5ff; }
+            .agent-turn pre { background: #e6ffed; border-color: #c3e6cb; }
         </style>
         <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
     </head>
     <body>
         <div class="main-container">
-            <h1>PPA Agent Result - Complete Info</h1>
+            <h1>PPA Agent Result - Non Ppa</h1>
             
             <div class="section">
-                <h2>Input Email</h2>
-                <pre>
+                <h2>Conversation History</h2>
+
+                <div class="conversation-turn customer-turn">
+                    <h4>Customer (2025-04-16T02:09:56)</h4>
+                    <pre>
         Hi, I'm interested in getting homeowners insurance for my new house.
         Can you help me with that?
         </pre>
+                </div>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 15px 0;">
+            
             </div>
 
             <div class="section">
@@ -172,13 +187,14 @@ graph TD;
 	check_discounts_node -.-> prepare_agency_review_node;
 	check_discounts_node -.-> generate_quote_node;
 	check_discounts_node -.-> error_node;
-	prepare_agency_review_node -.-> error_node;
+	check_discounts_node -.-> __end__;
 	prepare_agency_review_node -.-> __end__;
-	process_customer_response_node -.-> check_discounts_node;
+	prepare_agency_review_node -.-> error_node;
 	process_customer_response_node -.-> generate_info_request_node;
-	process_customer_response_node -.-> analyze_information_node;
+	process_customer_response_node -.-> check_discounts_node;
+	process_customer_response_node -.-> prepare_agency_review_node;
+	process_customer_response_node -.-> generate_quote_node;
 	process_customer_response_node -.-> error_node;
-	process_customer_response_node -.-> __end__;
 	classDef default fill:#f2f0ff,line-height:1.2
 	classDef first fill-opacity:0
 	classDef last fill:#bfb6fc
@@ -189,13 +205,13 @@ graph TD;
                 <div class="details-container section">
                     <h2>Complete State</h2>
                     <pre>{
-  "thread_id": "d997767c598b4c6895e4871b8c9396ce",
+  "thread_id": "decc2bf969214feeab83630594d0bbc8",
   "customer_email": "\n        Hi, I'm interested in getting homeowners insurance for my new house.\n        Can you help me with that?\n        ",
   "email_thread": [
     {
       "role": "customer",
       "content": "\n        Hi, I'm interested in getting homeowners insurance for my new house.\n        Can you help me with that?\n        ",
-      "timestamp": "2025-04-15T04:59:04.619864"
+      "timestamp": "2025-04-16T02:09:56.264315"
     }
   ],
   "customer_info": {},
@@ -213,6 +229,7 @@ graph TD;
   "proof_of_discount": null,
   "messages": [],
   "requires_review": false,
+  "review_outcome": null,
   "intent": "new_business",
   "lob": "HOME",
   "status": "new",

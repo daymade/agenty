@@ -1,11 +1,11 @@
 {
-  "thread_id": "912e71e037394ba6946c922dea0446b5",
+  "thread_id": "01897e9d58904a4aa7125610b5efc0f3",
   "customer_email": "\n        Hello, I need car insurance for my vehicle.\n        I'm John Smith, 35 years old, living at 123 Main St, Seattle, WA.\n\n        I drive a 2020 Toyota Camry. I've been driving for 15 years with no accidents.\n\n        Looking forward to your quote.\n        Best regards,\n        John\n        ",
   "email_thread": [
     {
       "role": "customer",
       "content": "\n        Hello, I need car insurance for my vehicle.\n        I'm John Smith, 35 years old, living at 123 Main St, Seattle, WA.\n\n        I drive a 2020 Toyota Camry. I've been driving for 15 years with no accidents.\n\n        Looking forward to your quote.\n        Best regards,\n        John\n        ",
-      "timestamp": "2025-04-15T04:58:06.279354"
+      "timestamp": "2025-04-16T02:09:22.414259"
     }
   ],
   "customer_info": {
@@ -31,15 +31,16 @@
   "messages": [
     {
       "role": "agent",
-      "content": "PPA Quote Summary - John Smith\n\nCustomer: John Smith, Age 35, 123 Main St, Seattle, WA.\nVehicle: 2020 Toyota Camry.\nHistory: Reports 15 years driving experience, no accidents.\nQuote Status: Initial request received. Quote not yet generated.\nMissing Information: Requires VIN, desired coverage limits/deductibles, vehicle usage, annual mileage, marital status, Driver's License #, prior insurance details for accurate quoting.\nAction Items/Flags: Collect missing information. Verify driving/claims history (MVR/CLUE). Confirm garaging address. Discuss coverage needs with customer before generating quote.",
-      "type": "quote_summary_for_review",
+      "content": "To ensure you receive the Safe Driver discount, may we verify your driving history?",
+      "type": "discount_query",
       "requires_review": true
     }
   ],
   "requires_review": true,
+  "review_outcome": null,
   "intent": "new_business",
   "lob": "PPA",
-  "status": "ready_for_review",
-  "discount_status": "no_proof_needed",
+  "status": "info_complete",
+  "discount_status": "proof_needed",
   "customer_question": null
 }

@@ -1,11 +1,11 @@
 {
-  "thread_id": "a53992e07aa0478c9a823e1936b2ed55",
+  "thread_id": "26b43cac1414461a97c063742bff0422",
   "customer_email": "\n        Hello, I'd like to get car insurance.\n        I'm Sarah Johnson and I drive a Honda.\n\n        Please let me know what information you need.\n\n        Thanks,\n        Sarah\n        ",
   "email_thread": [
     {
       "role": "customer",
       "content": "\n        Hello, I'd like to get car insurance.\n        I'm Sarah Johnson and I drive a Honda.\n\n        Please let me know what information you need.\n\n        Thanks,\n        Sarah\n        ",
-      "timestamp": "2025-04-15T04:58:34.485329"
+      "timestamp": "2025-04-16T02:09:34.360289"
     }
   ],
   "customer_info": {
@@ -36,18 +36,19 @@
   "messages": [
     {
       "role": "agent",
-      "content": "To continue with your auto insurance quote request and ensure its accuracy, could you please provide the following information:\n\n*   Driver's age\n*   Vehicle model\n*   Vehicle year\n*   Your full address",
+      "content": "Hello,\n\nTo continue preparing your auto insurance quote, could you please provide the following details:\n\n*   Driver's age\n*   Vehicle model\n*   Vehicle year\n*   Your full address\n\nOnce I have this information, I can generate an accurate quote for you.\n\nThanks!",
       "type": "info_request",
       "requires_review": true
     },
     {
       "role": "agent",
-      "content": "**PPA Quote Case Summary - Sarah Johnson**\n\n**Customer:** Sarah Johnson initiated a request for a Personal Auto Policy (PPA) quote.\n**Vehicle:** Provided make is Honda.\n**Quote Status:** No quote generated yet due to insufficient information.\n**Missing Information:** Critical details required include driver's age, specific Honda model, vehicle year, and the customer's full address.\n**Flags/Follow-up:** Initial contact lacks essential underwriting information. An automated request for the missing details (age, model, year, address) has been generated and requires review before sending to the customer. Further interaction is needed to gather necessary data for quote generation.",
+      "content": "**PPA Quote Case Summary: Sarah Johnson**\n\n**Customer:** Sarah Johnson\n**Vehicle:** Honda (Model/Year TBD)\n**Quote Data:** None generated.\n**Status:** Initial contact made. Basic customer name and vehicle make captured.\n**Missing Information:** Driver age, vehicle model, vehicle year, full address.\n**Follow-up:** Awaiting customer response to request for missing information required to generate quote. No immediate flags identified beyond incomplete data.",
       "type": "quote_summary_for_review",
       "requires_review": true
     }
   ],
   "requires_review": true,
+  "review_outcome": null,
   "intent": "new_business",
   "lob": "PPA",
   "status": "ready_for_review",
