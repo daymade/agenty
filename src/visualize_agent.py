@@ -71,6 +71,14 @@ MULTI_TURN_EMAIL_2 = """
     Sorry about that, it's an Outback Wilderness model.
     """
 
+# Email 3: Customer confirms discount eligibility
+MULTI_TURN_EMAIL_3 = """
+Subject: Re: Need a car insurance quote!
+
+Yes, that's correct, I have a clean driving record for the past 5 years - no accidents or violations.
+Please proceed with the quote.
+"""
+
 # --- Visualization Generation ---
 
 OUTPUT_DIR = Path("visualizations")
@@ -104,19 +112,44 @@ def generate_visualization(agent: PPAAgent, test_name: str, final_state: AgentSt
         logger.error(f"Error saving state JSON for {test_name}: {e}")
         state_json_str = f"<pre>Error saving state: {e}</pre>"
 
-    # 3. Generate HTML Report with Mermaid JS
+    # 3. Generate HTML for Conversation History
+    conversation_html_parts = ['<h2>Conversation History</h2>']
+    email_thread = final_state.get("email_thread", [])
+    if not email_thread:
+        conversation_html_parts.append("<p>No conversation history found.</p>")
+    else:
+        for i, message in enumerate(email_thread):
+            role = message.get("role", "unknown").capitalize()
+            timestamp = message.get("timestamp", "")
+            content = message.get("content", "No content")
+            msg_type = f' ({message.get("type", "")})' if role == 'Agent' else ''
+            ts_display = f' ({timestamp.split(".")[0]})' if timestamp else ''
+
+            # Determine CSS class based on role
+            turn_class = "customer-turn" if role == "Customer" else "agent-turn"
+
+            conversation_html_parts.append(f'''
+                <div class="conversation-turn {turn_class}">
+                    <h4>{role}{msg_type}{ts_display}</h4>
+                    <pre>{content}</pre>
+                </div>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 15px 0;">
+            ''')
+    conversation_history_html = "\n".join(conversation_html_parts)
+
+    # 4. Generate HTML Report with Mermaid JS
     html_content = f"""
     <!DOCTYPE html>
     <html>
     <head>
-        <title>PPA Agent Result - Complete Info</title>
+        <title>PPA Agent Result - {test_name.replace('_', ' ').title()}</title>
         <meta charset="UTF-8">
         <style>
             body {{
                 font-family: system-ui, -apple-system, sans-serif;
                 margin: 0;
                 padding: 20px;
-                background-color: #f5f5f5;
+                background-color: #f0f2f5;
             }}
             .main-container {{
                 max-width: 1800px;
@@ -125,6 +158,8 @@ def generate_visualization(agent: PPAAgent, test_name: str, final_state: AgentSt
                 padding: 20px;
                 border-radius: 8px;
                 box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                max-height: 600px;
+                overflow: auto;
             }}
             .section {{
                 margin-bottom: 30px;
@@ -208,16 +243,22 @@ def generate_visualization(agent: PPAAgent, test_name: str, final_state: AgentSt
                 background-color: #e2e3e5;
                 color: #383d41;
             }}
+            .conversation-turn {{ margin-bottom: 15px; }}
+            .conversation-turn h4 {{ margin-bottom: 5px; color: #444; font-size: 1.1em; }}
+            .conversation-turn pre {{ white-space: pre-wrap; word-wrap: break-word; background: #f9f9f9; padding: 10px; border: 1px solid #eee; border-radius: 4px; font-size: 0.95em; color: #333; }}
+            .customer-turn h4 {{ color: #0056b3; }}
+            .agent-turn h4 {{ color: #28a745; }}
+            .customer-turn pre {{ background: #e7f3ff; border-color: #cce5ff; }}
+            .agent-turn pre {{ background: #e6ffed; border-color: #c3e6cb; }}
         </style>
         <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
     </head>
     <body>
         <div class="main-container">
-            <h1>PPA Agent Result - Complete Info</h1>
+            <h1>PPA Agent Result - {test_name.replace('_', ' ').title()}</h1>
             
             <div class="section">
-                <h2>Input Email</h2>
-                <pre>{final_state.get('customer_email', 'No email content available')}</pre>
+                {conversation_history_html}
             </div>
 
             <div class="section">
@@ -298,18 +339,55 @@ def generate_messages_html(messages: list) -> str:
     for msg in messages:
         review_badge = '<span class="badge review">requires review</span>' if msg.get('requires_review') else ''
         type_badge = f'<span class="badge type">{msg.get("type", "unknown")}</span>'
+        review_outcome = msg.get('review_outcome', '')
+        if review_outcome:
+            review_outcome_badge = f'<span class="badge {review_outcome}">review: {review_outcome}</span>'
+        else:
+            review_outcome_badge = ''
         
         html_parts.append(f'''
-            <div class="message{'requires-review' if msg.get('requires_review') else ''}">
+            <div class="message {' requires-review' if msg.get('requires_review') else ''}">
                 <div style="margin-bottom: 8px">
                     <strong>agent</strong>
                     {type_badge}
                     {review_badge}
+                    {review_outcome_badge}
                 </div>
                 <pre style="margin: 0">{msg.get("content", "No content")}</pre>
             </div>
         ''')
     return '\n'.join(html_parts)
+
+
+def simulate_human_review(state: AgentState) -> AgentState:
+    """Simulates a human review by setting review_outcome to 'accepted'.
+    
+    In a real implementation, this would be an external UI/API call where
+    a human agent reviews the content and provides their decision.
+    """
+    logger.info("Simulating human review process...")
+    
+    # Check if review is required
+    if not state.get("requires_review", False):
+        logger.info("No review required for this state.")
+        return state
+    
+    # In a real system, this is where we'd pause and wait for human input
+    logger.info("State requires human review. Simulating human agent accepting the output...")
+    
+    # Create a copy of the state to modify
+    updated_state = dict(state)
+    
+    # Simulate human accepting the output
+    updated_state["review_outcome"] = "accepted"
+    
+    # For visualization purposes, tag the messages that were reviewed
+    for msg in updated_state.get("messages", []):
+        if msg.get("requires_review", False):
+            msg["review_outcome"] = "accepted"
+    
+    logger.info("Human review simulation completed: Output ACCEPTED")
+    return updated_state
 
 if __name__ == "__main__":
     logger.info("Initializing PPA Agent...")
@@ -331,25 +409,56 @@ if __name__ == "__main__":
             with open(html_path, "w") as f:
                 f.write(f"<h1>Error processing {test_name}</h1><pre>{e}</pre>")
 
-    # Run the multi-turn test case
+    # Run the multi-turn test case with human review simulation
     logger.info("Processing test email: multi_turn (Turn 1)")
     multi_turn_test_name = "multi_turn_final"
+    human_review_test_name = "multi_turn_with_review" 
     try:
+        # Turn 1: Initial customer email
         state_1 = agent.process_email(TEST_CASES["multi_turn_1"])
         thread_id_1 = state_1.get("thread_id")
-        if thread_id_1:
-            logger.info(f"Processing test email: multi_turn (Turn 2, Thread: {thread_id_1})")
-            state_2 = agent.process_email(MULTI_TURN_EMAIL_2, thread_id=thread_id_1)
-            logger.info("Generating visualization for multi-turn final state...")
-            generate_visualization(agent, multi_turn_test_name, state_2)
-        else:
-            logger.error("Could not get thread_id from multi_turn_1, skipping Turn 2.")
-            html_path = OUTPUT_DIR / f"{multi_turn_test_name}_result.html"
-            with open(html_path, "w") as f:
-                f.write(
-                    f"<h1>Error processing {multi_turn_test_name}</h1><pre>Could not get thread_id</pre>"
-                )
+        if not thread_id_1:
+            raise ValueError("Could not get thread_id from multi_turn_1")
+        
+        # Turn 2: Customer provides missing vehicle model
+        logger.info(f"Processing test email: multi_turn (Turn 2, Thread: {thread_id_1})")
+        state_2 = agent.process_email(MULTI_TURN_EMAIL_2, thread_id=thread_id_1)
+        thread_id_2 = state_2.get("thread_id")
+        if not thread_id_2:
+            raise ValueError("Could not get thread_id from multi_turn_2")
+        
+        # Turn 3: Customer confirms clean driving record
+        logger.info(f"Processing test email: multi_turn (Turn 3, Thread: {thread_id_2})")
+        state_3 = agent.process_email(MULTI_TURN_EMAIL_3, thread_id=thread_id_2)
+        thread_id_3 = state_3.get("thread_id")
+        if not thread_id_3:
+            raise ValueError("Could not get thread_id from multi_turn_3")
 
+        # Save the state before human review (may require review)
+        logger.info("Generating visualization for multi-turn state before human review...")
+        generate_visualization(agent, multi_turn_test_name, state_3)
+        
+        # Check if human review is required
+        if state_3.get("requires_review", False):
+            logger.info("State requires human review, simulating review process...")
+            # Simulate human review (set review_outcome to 'accepted')
+            reviewed_state = simulate_human_review(state_3)
+            
+            # In a real implementation, this is where we'd use LangGraph's thread
+            # capabilities to resume the workflow with the updated state
+            # For our simulation, we'll manually set the state and continue
+            
+            # Save the state after human review 
+            logger.info("Generating visualization for state after human review...")
+            generate_visualization(agent, human_review_test_name, reviewed_state)
+            
+            # For a complete simulation, we would pass the reviewed state back to
+            # the LangGraph workflow and continue execution. In a real implementation,
+            # this would involve LangGraph's thread management capabilities.
+            logger.info("In a real implementation, execution would continue after human review.")
+        else:
+            logger.info("No human review required for this state.")
+            
     except Exception as e:
         logger.error(f"Error processing multi-turn test case: {e}", exc_info=True)
         html_path = OUTPUT_DIR / f"{multi_turn_test_name}_result.html"

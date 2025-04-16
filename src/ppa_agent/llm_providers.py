@@ -60,6 +60,7 @@ class GeminiProvider(BaseLLMProvider, BaseModel):
 
     def generate_sync(self, prompt: str, structured: bool = False, **kwargs: Any) -> str:
         """Generate text from prompt synchronously using the NEW Gemini SDK."""
+        logger.debug(f"Sending prompt to Gemini: {prompt}")
         # Use GenerateContentConfig with camelCase based on migration guide
         config = genai.types.GenerateContentConfig(
             temperature=self.temperature,
@@ -73,7 +74,6 @@ class GeminiProvider(BaseLLMProvider, BaseModel):
                 **kwargs
             )
 
-            # Handle potential errors or blocked responses
             if not response.candidates:
                 content = "Response blocked or empty."
                 if hasattr(response, "prompt_feedback") and response.prompt_feedback and response.prompt_feedback.block_reason:
@@ -83,44 +83,42 @@ class GeminiProvider(BaseLLMProvider, BaseModel):
                     logger.warning("Gemini response empty.")
                 raise ValueError(content)
             
-            # For structured output, validate JSON
+            if not response.candidates[0].content.parts:
+                raise ValueError("Received empty response parts from Gemini API")
+
+            response_text = response.candidates[0].content.parts[0].text
+            logger.debug(f"Raw response from Gemini: {response_text}")
+
             if structured:
-                raw_text = response.text
-                json_str = raw_text # Default to raw text
-                # Try to extract JSON from markdown code fences
-                match = re.search(r"```(?:json)?\n(.*?)```", raw_text, re.DOTALL)
-                if match:
-                    extracted = match.group(1).strip()
-                    # Basic check if it looks like JSON before overriding
-                    if extracted.startswith('{') and extracted.endswith('}'): 
-                        json_str = extracted
-                        logger.debug(f"Extracted JSON from markdown fences: {json_str}")
-                    else:
-                        logger.warning(f"Found markdown fences but content doesn't look like JSON: {extracted}")
-                else:
-                     logger.debug("No markdown fences found, attempting to parse raw text.")
+                # Attempt to extract JSON robustly
+                json_str = response_text.strip() # Strip leading/trailing whitespace
+                # Check if response is wrapped in markdown code block
+                if json_str.startswith("```json\n") and json_str.endswith("\n```"):
+                    json_str = json_str[len("```json\n"):-len("\n```")]
+                elif json_str.startswith("```") and json_str.endswith("```"):
+                     # Handle potential block without language specifier
+                    json_str = json_str[3:-3]
+                
+                json_str = json_str.strip() # Strip again after potential extraction
 
                 try:
-                    # json_str = response.text # Old logic
-                    json.loads(json_str)  # Validate extracted/raw JSON
-                    return json_str
+                    # Parse the cleaned JSON string
+                    parsed_json = json.loads(json_str)
+                    # Return the validated JSON string representation
+                    return json.dumps(parsed_json) 
                 except json.JSONDecodeError as e:
-                    logger.error(f"Invalid JSON response from Gemini after extraction attempt. Original text: '{raw_text}', Parsed string: '{json_str}', Error: {e}")
-                    # logger.error(f"Invalid JSON response from Gemini: {response.text}") # Old log
-                    raise ValueError("Response could not be parsed as valid JSON")
-            
-            # For unstructured output, return text directly
-            return response.text
+                    logger.error(f"Invalid JSON response from Gemini after extraction attempt. Original text: '{response_text}', Parsed string: '{json_str}', Error: {e}")
+                    raise ValueError("Response could not be parsed as valid JSON") from e
+            else:
+                return response_text # Return raw text if not structured
 
-        except genai.errors.APIError as e:
-            if "blocked" in str(e).lower() or "safety" in str(e).lower():
-                 logger.warning(f"Gemini prompt likely blocked: {e}")
-                 raise ValueError(f"Response blocked due to safety concerns: {e}")
-            logger.error(f"Gemini API error: {e}", exc_info=True)
-            raise
         except Exception as e:
-            logger.error(f"Gemini generic error ({type(e).__name__}): {e}", exc_info=True)
-            raise
+            # Catch other potential API errors (network, authentication, etc.)
+            logger.error(f"Gemini generic error ({type(e).__name__}): {e}", exc_info=False) # Avoid duplicate traceback for simple ValueErrors
+            # Re-raise specific errors or a generic one
+            if isinstance(e, ValueError): # Propagate our JSON parsing error
+                raise e
+            raise RuntimeError(f"Error interacting with Gemini API: {e}") from e
 
     async def generate(self, prompt: str, structured: bool = False, **kwargs: Any) -> str:
         """Generate text from prompt asynchronously using the NEW Gemini SDK."""
