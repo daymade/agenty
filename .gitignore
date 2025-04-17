@@ -57,3 +57,6 @@ test_outputs/
 
 # windsurf rules
 .windsurfrules
+
+# Un-ignore specific log file needed for debugging
+#!agent.log

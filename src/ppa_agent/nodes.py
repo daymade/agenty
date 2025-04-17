@@ -416,8 +416,10 @@ def generate_info_request(state: AgentState, llm: BaseLLMProvider) -> Dict[str, 
     ) + feedback_prompt_addition # Add feedback if present
 
     try:
+        logger.debug(f"--- Sending prompt to LLM for info request ---\n{prompt}\n-----------------------------------------------------") # Log the prompt
         # Use generate_sync with structured=False for plain text email body
         response_text = llm.generate_sync(prompt, structured=False)
+        logger.info("--- LLM call generate_sync completed successfully ---") # Log success
         logger.debug(f"Raw info request response from LLM: {response_text}")
 
         message = {
@@ -880,57 +882,54 @@ def process_customer_response(state: AgentState, llm: BaseLLMProvider) -> Dict[s
     )
 
     try:
+        logger.debug(f"--- Sending prompt to LLM for response processing ---\n{prompt}\n-----------------------------------------------------") # Log the prompt
         # Use generate_sync with structured=True for JSON output
         response_str = llm.generate_sync(prompt, structured=True)
+        logger.info("--- LLM call generate_sync completed successfully for response processing ---") # Log success
         logger.debug(f"Raw response processing result from LLM: {response_str}")
         result = json.loads(response_str)
 
         logger.info(f"Parsed customer response analysis: {result}")
 
         updates: Dict[str, Any] = {}
+        current_customer_info = state.get("customer_info", {}).copy()
+        logger.debug(f"Customer info BEFORE LLM update: {current_customer_info}")
 
-        # Update customer_info with newly provided info
+        # 1. Update customer_info with newly provided info from LLM
         provided_info = result.get("provided_info", {})
         if provided_info:
-            # Merge new info into existing customer_info
-            current_customer_info = state.get("customer_info", {}).copy()
             for key, value in provided_info.items():
-                if value:  # Only update if LLM provided a non-empty value
+                if value is not None and value != "": # Only update if LLM provided a non-empty/None value
                     current_customer_info[key] = value
-            updates["customer_info"] = current_customer_info
-        else:
-            # Ensure customer_info is preserved if nothing new was provided
-            updates["customer_info"] = state.get("customer_info", {})
+        updates["customer_info"] = current_customer_info
+        logger.debug(f"Customer info AFTER LLM update: {current_customer_info}")
 
-        # Update missing_info based on LLM's calculation
-        if "updated_missing_info" in result:
-            updates["missing_info"] = result["updated_missing_info"]
-            # Recalculate status based on newly updated missing_info
-            current_status = "info_incomplete" if updates["missing_info"] else "info_complete"
-            updates["status"] = current_status
-        else:
-            # If LLM failed to provide updated_missing_info, recalculate manually
-            current_info = updates.get("customer_info", state.get("customer_info", {}))
-            # Use requirements from config
-            current_missing = [req for req in config.PPA_REQUIREMENTS if not current_info.get(req)]
-            updates["missing_info"] = current_missing
-            updates["status"] = "info_incomplete" if current_missing else "info_complete"
-            logger.warning("LLM did not provide updated_missing_info, recalculated manually.")
+        # 2. Always recalculate missing_info manually based on updated customer_info
+        current_missing = [
+            req for req in config.PPA_REQUIREMENTS if not current_customer_info.get(req)
+        ]
+        updates["missing_info"] = current_missing
+        logger.info(f"Recalculated missing info: {current_missing}")
 
-        # Update discount proof status if answered
+        # 3. Set status based *only* on the manual check
+        current_status = "info_incomplete" if current_missing else "info_complete"
+        updates["status"] = current_status
+        logger.info(f"Set status based on manual check: {current_status}")
+
+        # 4. Update discount proof status if answered by LLM
         if result.get("answered_discount_proof") is not None:
             updates["proof_of_discount"] = result["answered_discount_proof"]
             logger.info(f"Customer answered discount proof: {updates['proof_of_discount']}")
 
-        # Handle customer questions (for future routing or response generation)
-        if result.get("customer_question"):
-            logger.info(f"Customer asked a question: {result['customer_question']}")
-            # We might add this question to the messages list or handle it specifically
-            # For now, just log it. Could set a specific status too.
-            updates["customer_question"] = result["customer_question"]
-            updates["status"] = "question_asked"  # Example new status for routing
+        # 5. Store customer question if detected by LLM (but don't change status)
+        customer_question = result.get("customer_question")
+        if customer_question:
+            updates["customer_question"] = customer_question
+            logger.info(f"LLM detected customer question: {customer_question}")
+            # NOTE: We are NOT changing status to 'question_asked' here anymore.
+            # Downstream routing (_decide_after_response) should check for this field.
 
-        logger.info(f"State updates after processing response: {updates}")
+        logger.info(f"Final state updates returned by process_customer_response: {updates}")
         return updates
 
     except (json.JSONDecodeError, ValueError, Exception) as e:

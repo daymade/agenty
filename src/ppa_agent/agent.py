@@ -26,6 +26,7 @@ from .nodes import ( # noqa
     process_customer_response,
     prepare_quote_review,
     prepare_info_request_review,
+    prepare_discount_review,
     final_state_passthrough, # Import new node
 )
 from .llm_providers import (
@@ -51,6 +52,7 @@ ERROR_NODE = "error_node"
 
 PREPARE_QUOTE_REVIEW_NODE = "prepare_quote_review_node"
 PREPARE_INFO_REQUEST_REVIEW_NODE = "prepare_info_request_review_node"
+PREPARE_DISCOUNT_REVIEW_NODE = "prepare_discount_review_node"
 FINAL_STATE_PASSTHROUGH_NODE = "final_state_passthrough_node" # Define name
 
 MAX_RETRIES = 2
@@ -65,40 +67,50 @@ class PPAAgent:
         llm_provider: Optional[BaseLLMProvider] = None,
     ) -> None:
         """Initialize the PPA Agent."""
+        logger.info(">>> PPAAgent.__init__ started.") # Log start
         self.conversation_threads: Dict[str, Dict[str, Any]] = {}
-        
-        # Set up state for thread tracking - will be used with LangGraph checkpointing
-        # We'll use thread_id as the key in the checkpointing mechanism
         self.threads = {}
         logger.info("Initialized agent with thread tracking")
-        
+
+        logger.info(">>> Checking for provided llm_provider...") # Log before check
         if llm_provider:
+            logger.info(">>> Using provided llm_provider.") # Log if using provided
             self.llm: BaseLLMProvider = llm_provider
         else:
+            logger.info(">>> No llm_provider provided, determining type...") # Log entering else
             provider_type = provider.lower()
             if provider_type == "gemini":
+                logger.info(">>> Provider type is 'gemini'. Loading config...") # Log gemini path
                 gemini_config = GeminiConfig.from_env()
                 model_to_use = model or gemini_config.model
-                logger.info(f"Initializing GeminiProvider with model: {model_to_use}")
+                logger.info(f">>> Initializing GeminiProvider with model: {model_to_use}...") # Log before Gemini init
                 self.llm = GeminiProvider(
-                    api_key=gemini_config.api_key,
+                    api_key=gemini_config.api_key, # Ensure key is loaded correctly
                     model=model_to_use
                 )
+                logger.info(">>> GeminiProvider initialized.") # Log after Gemini init
             elif provider_type == "openai":
+                logger.info(">>> Provider type is 'openai'. Getting API key...") # Log openai path
                 api_key = os.getenv("OPENAI_API_KEY")
                 model_name = model or config.OPENAI_MODEL_NAME
                 if not api_key:
+                    logger.error("!!! OpenAI API key not found in environment variables.") # Log error
                     raise ValueError("OpenAI API key not found in environment variables.")
-                logger.info(f"Initializing OpenAIProvider with model: {model_name}")
+                logger.info(f">>> Initializing OpenAIProvider with model: {model_name}...") # Log before OpenAI init
                 self.llm = OpenAIProvider(
                     api_key=api_key,
                     model=model_name
                 )
+                logger.info(">>> OpenAIProvider initialized.") # Log after OpenAI init
             else:
+                logger.error(f"!!! Unsupported LLM provider type: {provider_type}") # Log error
                 raise ValueError(f"Unsupported LLM provider type: {provider_type}")
 
+        logger.info(">>> Building and compiling workflow...") # Log before build
         # Build and compile the workflow with the checkpointer
         self.compiled_workflow = self._build_workflow()
+        logger.info(">>> Workflow built and compiled successfully.") # Log after build
+        logger.info(">>> PPAAgent.__init__ finished.") # Log end
 
     def _decide_intent_branch(self, state: AgentState) -> str:
         intent = state.get("intent", "error")
@@ -136,55 +148,35 @@ class PPAAgent:
 
     def _decide_after_response(self, state: AgentState) -> str:
         """Decides the next step after processing a customer's response."""
-        status = state.get("status", "error_processing_response")
-        missing_info = state.get("missing_info", [])
-        proof_of_discount = state.get("proof_of_discount") # Populated by process_customer_response
+        logger.debug(f"---> State RECEIVED by _decide_after_response: {state}") # Log incoming state
+
+        # Check if the customer asked a question instead of providing info
         customer_question = state.get("customer_question")
-        # Get discount status from the *previous* check node if available
-        discount_status_from_check = state.get("discount_status") 
+        if customer_question:
+            logger.info(f"Customer asked a question ('{customer_question}'). Ending turn to allow agent to respond later.")
+            # TODO: Add logic to generate response to the question if needed before END
+            return END # End the current flow, wait for next interaction
 
-        logger.info(f"Routing after processing response. Status: {status}, Missing Info: {missing_info}, Discount Proof: {proof_of_discount}, Prev Discount Status: {discount_status_from_check}, Question: {bool(customer_question)}")
+        status = state.get("status", "error_processing_response") # Default to error if status missing
+        logger.info(f"Routing after processing response. Status: {status}")
 
-        if status == "error_processing_response":
-            logger.error("Error processing response, routing to error node.")
-            return ERROR_NODE # Use constant
-
-        if missing_info:
-            # If info became incomplete again (unlikely but possible), ask again
-            logger.info(f"Information still missing ({missing_info}), routing to generate_info_request_node.")
+        if status == "info_complete":
+            logger.info("Information complete. Routing to check_discounts_node.")
+            return CHECK_DISCOUNTS_NODE # Use constant
+        elif status == "info_incomplete":
+            logger.info("Information incomplete. Routing to generate_info_request_node.")
             return GENERATE_INFO_REQUEST_NODE # Use constant
-        else: # Info is complete
-            # Check if discount proof was just provided in this response
-            if proof_of_discount is not None:
-                # Info complete, but new proof provided -> Re-run discount check to validate
-                logger.info("Info complete and discount proof provided, routing to check_discounts_node for validation.")
-                return CHECK_DISCOUNTS_NODE # Use constant
-            else:
-                # Info complete, no new proof provided. Check previous discount status.
-                discount_fully_handled = discount_status_from_check in ["no_proof_needed", "validated"]
-
-                if discount_fully_handled:
-                    # Info complete and discount situation already handled -> Generate Quote
-                    logger.info("Info complete and discount previously handled, routing to generate_quote_node.")
-                    if customer_question and "quote" in customer_question.lower():
-                        logger.info(f"Customer asked '{customer_question}', proceeding to generate quote as requested.")
-                    elif customer_question:
-                        # Handle other questions later if needed, proceed with quote for now
-                        logger.warning(f"Customer asked '{customer_question}' but proceeding to quote generation. Question may need review later.")
-                    # Ensure GENERATE_QUOTE_NODE is a valid target in add_conditional_edges if uncommenting this path
-                    # For now, routing to CHECK_DISCOUNTS_NODE as a safe intermediate step if quote generation isn't directly reachable.
-                    # return GENERATE_QUOTE_NODE # Uncomment if graph allows direct routing here
-                    logger.warning("Routing to check_discounts_node temporarily as GENERATE_QUOTE_NODE might not be directly reachable from PROCESS_CUSTOMER_RESPONSE.")
-                    return CHECK_DISCOUNTS_NODE # Safer intermediate route for now
-                else:
-                    # Info complete, but discount status is still unclear (e.g., query unanswered)
-                    # Re-run discount check to potentially ask again or flag for review
-                    logger.info("Info complete but discount status unclear after response, routing back to check_discounts_node.")
-                    return CHECK_DISCOUNTS_NODE # Use constant
-
-        # Fallback/Error case (should not be reached)
-        logger.error("Reached unexpected state in _decide_after_response, routing to review.")
-        return PREPARE_AGENCY_REVIEW_NODE # Use constant
+        elif status == "error_processing_response":
+             logger.error("Error processing response reported in state, routing to error node.")
+             return ERROR_NODE # Use constant
+        else:
+            logger.error(f"Unknown status '{status}' after customer response. Routing to error_node.")
+            # Update state with error message
+            # Ensure messages list exists
+            if "messages" not in state or not isinstance(state["messages"], list):
+                state["messages"] = []
+            state["messages"].append(("system", f"Error: Unknown status '{status}' after processing customer response."))
+            return ERROR_NODE # Use constant
 
     def _decide_after_discount_check(self, state: AgentState) -> str:
         """Decides the next step after checking for discounts (no review step here)."""
@@ -222,15 +214,11 @@ class PPAAgent:
             return ERROR_NODE
 
     def _decide_after_quote(self, state: AgentState) -> str:
-        requires_review = state.get("requires_review", True)
-        logger.info(f"Routing after quote generation. Requires Review: {requires_review}")
-
-        if not requires_review:
-            logger.info("Quote generated and no review flagged, ending workflow.")
-            return str(END)
-        else:
-            logger.info("Quote generated but review flagged, proceeding to prepare review.")
-            return "prepare_agency_review_node"
+        # Removed check for requires_review flag, as generate_quote doesn't set it.
+        # Assuming in this HITL flow, generated quotes always proceed to review prep.
+        logger.info("Routing after quote generation. Proceeding to prepare review.")
+        # Route to the CORRECT review preparation node constant
+        return PREPARE_QUOTE_REVIEW_NODE
 
     def _decide_after_step_review(self, state: AgentState) -> str:
         """Decides the next routing step after human review of a specific step.
@@ -400,6 +388,7 @@ class PPAAgent:
         # --- Review Node Partials (Binding Step Name) ---
         prepare_quote_review_node = partial(prepare_quote_review)
         prepare_info_request_review_node = partial(prepare_info_request_review)
+        prepare_discount_review_node = partial(prepare_discount_review)
         final_state_passthrough_node = partial(final_state_passthrough) # Add the new node
 
         # --- Add Nodes to Graph ---
@@ -414,6 +403,7 @@ class PPAAgent:
         # HITL Nodes
         workflow.add_node(PREPARE_QUOTE_REVIEW_NODE, prepare_quote_review_node)
         workflow.add_node(PREPARE_INFO_REQUEST_REVIEW_NODE, prepare_info_request_review_node)
+        workflow.add_node(PREPARE_DISCOUNT_REVIEW_NODE, prepare_discount_review_node)
         workflow.add_node(FINAL_STATE_PASSTHROUGH_NODE, final_state_passthrough_node) # Add the new node
         workflow.add_node(HANDLE_MAX_RETRIES, self._handle_max_retries)
 
@@ -477,15 +467,12 @@ class PPAAgent:
             PROCESS_CUSTOMER_RESPONSE_NODE, # Where should this go after processing?
             self._decide_after_response,
             {
-                # Typically re-analyze info based on new customer input?
-                ANALYZE_INFORMATION_NODE: ANALYZE_INFORMATION_NODE,
-                # Old paths for reference (may need review)
-                # GENERATE_INFO_REQUEST_NODE: GENERATE_INFO_REQUEST_NODE,
+                # Map the string outcome to the target node's string name
                 CHECK_DISCOUNTS_NODE: CHECK_DISCOUNTS_NODE,
-                # GENERATE_QUOTE_NODE: GENERATE_QUOTE_NODE, 
+                GENERATE_INFO_REQUEST_NODE: GENERATE_INFO_REQUEST_NODE, # Use string name
+                END: END,
                 ERROR_NODE: ERROR_NODE,
-                # END is not a direct target here; subsequent nodes decide END
-            } # TODO: Revisit routing from customer response processing
+            }
         )
 
         # --- Error and Max Retries Handling ---
@@ -507,13 +494,24 @@ class PPAAgent:
         current_thread_id: str
         email_history: List[Dict[str, Any]]
         previous_customer_info: Dict[str, Any] = {}
+        last_state: Optional[AgentState] = None # Track the last full state
 
         if thread_id and thread_id in self.conversation_threads:
             current_thread_id = thread_id
             logger.info(f"Resuming existing thread: {current_thread_id}")
             thread_data = self.conversation_threads[current_thread_id]
             email_history = thread_data.get("history", [])
-            previous_customer_info = thread_data.get("last_customer_info", {})
+            # --- FIX: Load customer info from LAST SAVED STATE, not the initial one --- 
+            # previous_customer_info = thread_data.get("last_customer_info", {}) # OLD BUGGY LINE
+            last_state = thread_data.get("last_state") # Get the last saved state
+            if last_state:
+                previous_customer_info = last_state.get("customer_info", {}).copy()
+                logger.info(f"Loaded customer_info from last_state: {previous_customer_info}")
+            else:
+                 # Fallback if no last state somehow (shouldn't happen in normal flow)
+                 previous_customer_info = thread_data.get("last_customer_info", {}).copy() 
+                 logger.warning(f"No last_state found for thread {current_thread_id}. Falling back to last_customer_info: {previous_customer_info}")
+            # ---------------------------------------------------------------------------
         else:
             current_thread_id = uuid.uuid4().hex
             logger.info(f"Creating new thread: {current_thread_id}")
@@ -561,18 +559,20 @@ class PPAAgent:
             # Update history for existing thread before invoking
             self.conversation_threads[current_thread_id]["history"] = email_history
             # Load previous state if needed (or just use current info)
-            initial_state = initial_state # State contains the new email and thread context
+            # initial_state = initial_state # REMOVED - Redundant, state is set correctly above
             # For existing threads, start by processing the response
-            workflow_config = {"configurable": {"thread_entry_point": "process_customer_response_node"}}
-            logger.info(f"Setting workflow entry point to: process_customer_response_node")
+            workflow_config = {"configurable": {"thread_entry_point": PROCESS_CUSTOMER_RESPONSE_NODE}}
+            logger.info(f"Setting workflow entry point to: {PROCESS_CUSTOMER_RESPONSE_NODE}")
         else:
             logger.info(f"Creating new thread: {current_thread_id}")
+            # Note: We still set last_customer_info here for potential future use/debugging
+            # but the primary source for resuming is now last_state.
             self.conversation_threads[current_thread_id] = {
                 "history": email_history,
                 "last_customer_info": {},
                 "last_state": None,
             }
-            initial_state = initial_state
+            # initial_state = initial_state # REMOVED - Redundant, state is set correctly above
             # For new threads, start normally
             workflow_config = None
 
@@ -589,14 +589,41 @@ class PPAAgent:
         workflow_config["configurable"] = workflow_config.get("configurable", {})
         workflow_config["configurable"]["thread_id"] = current_thread_id
             
-        final_state = self.compiled_workflow.invoke(initial_state, config=workflow_config)
+        final_state: AgentState
+        try:
+            final_state = self.compiled_workflow.invoke(initial_state, config=workflow_config)
+            # Log the state immediately after invoke returns successfully
+            logger.info(f"Invoke completed for thread {current_thread_id}. State: {final_state}")
+            logger.info(f"---> Invoke result review step: {final_state.get('step_requiring_review')}")
+            logger.info(f"---> Invoke result status: {final_state.get('status')}")
 
-        # Log the state immediately after invoke returns
-        logger.info(f"Invoke completed for thread {current_thread_id}. State: {final_state}")
-        logger.info(f"---> Invoke result review step: {final_state.get('step_requiring_review')}")
-        logger.info(f"---> Invoke result status: {final_state.get('status')}")
+            # --- CRITICAL FIX: Store the final state back into memory --- 
+            if current_thread_id in self.conversation_threads:
+                self.conversation_threads[current_thread_id]["last_state"] = final_state.copy()
+                logger.info(f"Successfully stored final state for thread {current_thread_id} in conversation_threads.")
+                logger.debug(f"Keys in conversation_threads AFTER state save for {current_thread_id}: {list(self.conversation_threads.keys())}")
+            else:
+                logger.warning(f"Thread {current_thread_id} not found in conversation_threads after invoke? State not stored.")
+            # --------------------------------------------------------
+
+        except Exception as e:
+            logger.error(f"!!! Exception during workflow invoke for thread {current_thread_id}: {e}", exc_info=True)
+            # Return a specific error state for the server to handle
+            error_state: AgentState = {
+                "thread_id": current_thread_id,
+                "status": "error_during_invoke",
+                "error_message": f"{type(e).__name__}: {str(e)}",
+                "initial_state_before_error": initial_state, # Include state passed *to* invoke
+                "customer_email": email_content, # Include original trigger email
+                "email_thread": email_history # Include thread history up to error
+            }
+            # Update internal storage with error state for consistency
+            if current_thread_id in self.conversation_threads:
+                 self.conversation_threads[current_thread_id]["last_state"] = error_state
+            return error_state
 
         # === Workaround: Extract critical value, deepcopy storage, reconstruct return ===
+        # (This part only runs if invoke succeeds)
         # 1. Extract the crucial value BEFORE potential modification by LangGraph internals
         original_review_step = final_state.get("step_requiring_review")
         original_data_for_review = final_state.get("data_for_review") # Also save data
@@ -634,22 +661,12 @@ class PPAAgent:
         decision: Literal["accepted", "rejected"],
         feedback: Optional[str] = None,
     ) -> AgentState:
-        """Resumes the workflow after a human review decision.
-
-        Args:
-            thread_id: The ID of the conversation thread to resume.
-            decision: The human reviewer's decision ('accepted' or 'rejected').
-            feedback: Optional feedback text if the decision was 'rejected'.
-
-        Returns:
-            The final AgentState after the workflow resumes and completes or pauses again.
-
-        Raises:
-            ValueError: If the thread_id is invalid or not awaiting review.
-        """
+        """Resume the workflow after a human review decision."""
+        logger.debug(f"Inside resume_after_review for thread {thread_id}. Keys in conversation_threads: {list(self.conversation_threads.keys())}")
         logger.info(f"Resuming workflow for thread {thread_id} after human review. Decision: {decision}")
 
         # Verify thread exists in conversation data
+        logger.debug(f"Checking for thread {thread_id}. Available threads: {list(self.conversation_threads.keys())}") # Log available threads
         if thread_id not in self.conversation_threads:
             raise ValueError(f"Invalid thread_id: {thread_id}")
             

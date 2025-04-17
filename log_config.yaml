@@ -1,0 +1,39 @@
+# log_config.yaml
+version: 1
+disable_existing_loggers: False
+formatters:
+  default:
+    fmt: "%(levelname)s - %(asctime)s - %(name)s - %(message)s"
+    datefmt: "%Y-%m-%d %H:%M:%S"
+  standard:
+    format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+  detailed:
+    format: '%(asctime)s - %(name)s - %(levelname)s - %(module)s:%(lineno)d - %(message)s'
+handlers:
+  console:
+    class: logging.StreamHandler
+    level: DEBUG
+    formatter: standard
+    stream: ext://sys.stdout
+  file:
+    class: logging.FileHandler
+    level: DEBUG
+    formatter: detailed
+    filename: agent.log
+    mode: a
+loggers:
+  uvicorn:
+    level: INFO
+    handlers: [console]
+    propagate: no
+  uvicorn.error:
+    level: INFO
+    handlers: [console]
+    propagate: no
+  uvicorn.access:
+    level: INFO
+    handlers: [console]
+    propagate: no
+root:
+  level: DEBUG
+  handlers: [console, file]

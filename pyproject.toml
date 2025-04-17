@@ -35,6 +35,8 @@ google-genai = "^1.10.0"
 zstandard = "^0.23.0"
 d3graph = "^2.5.0"
 langgraph-sdk = "^0.1.61"
+fastapi = "^0.115.12"
+uvicorn = {extras = ["standard"], version = "^0.34.1"}
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.5"
