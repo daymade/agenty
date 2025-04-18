@@ -63,3 +63,7 @@ test_outputs/
 
 # LangGraph Checkpoints
 .langgraph*/
+
+# SQLite database files
+*.sqlite
+ppa_agent_state.sqlite

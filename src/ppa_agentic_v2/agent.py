@@ -2,7 +2,7 @@
 import logging
 import json
 from typing import List, Dict, Any, Optional
-from langgraph.graph import StateGraph, END
+from langgraph.graph import StateGraph, END, START
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, BaseMessage, SystemMessage
 from pydantic import ValidationError # Use BaseException for broader catch if needed
 from langgraph.prebuilt import ToolNode # Import ToolNode
@@ -11,7 +11,19 @@ from .tools import all_tools # Import the list of tools
 from .prompts import PLANNER_PROMPT_TEMPLATE_V1
 from .llm import get_llm_client, MockPlannerLLM # Import mock LLM for now
 import uuid # Import uuid for generating tool call IDs
+from langgraph.checkpoint.sqlite import SqliteSaver # <-- Import Saver
+from .config import SQLITE_DB_NAME # <-- Import DB name
+import sqlite3 # <-- Add sqlite3 import
+import os
+
 logger = logging.getLogger(__name__)
+
+# --- Create SQLite Checkpointer for standalone mode --- #
+# Create SQLite connection
+conn = sqlite3.connect(SQLITE_DB_NAME, check_same_thread=False)
+# Create the SqliteSaver with the connection
+sqlite_memory = SqliteSaver(conn)
+logger.info(f"SQLite checkpointer initialized with database: {SQLITE_DB_NAME}")
 
 # --- Agent Nodes ---
 
@@ -186,68 +198,105 @@ def should_execute(state: AgentState) -> str:
 
 # --- Graph Definition ---
 
-def build_agent_graph():
-    """Builds the LangGraph StateGraph."""
+def build_agent_graph(use_persistence=False):
+    """Builds the LangGraph StateGraph with optional persistence.
+    
+    Args:
+        use_persistence (bool): If True, use SQLite persistence. 
+                               If False, no persistence (for LangGraph dev server).
+    """
     workflow = StateGraph(AgentState)
 
-    # Add nodes
+    # Add nodes (same as before)
     workflow.add_node("planner", planner_node)
     workflow.add_node("executor", execute_tool_node)
 
-    workflow.set_entry_point("planner")
+    # Setup explicit START and END routing for best practices
+    workflow.add_edge(START, "planner")  # Explicit edge from START to planner
 
-    # Define edges for the basic loop
+    # Define edges (same as before)
     workflow.add_conditional_edges(
         "planner",
-        should_execute, # Decide whether to execute or end
+        should_execute,
         {
             "execute": "executor",
             END: END
         }
     )
-    # After execution, always go back to planner
     workflow.add_edge("executor", "planner")
 
-    # Compile the graph (NO checkpointer or interrupts yet)
-    app = workflow.compile()
-    logger.info("Agent graph compiled (Milestone 2 - No Persistence/HITL).")
+    # Compile the graph with conditionally using the checkpointer
+    if use_persistence:
+        # For standalone runs, use our SQLite checkpointer
+        app = workflow.compile(checkpointer=sqlite_memory)
+        logger.info("Agent graph compiled (Milestone 3 - WITH SQLite Persistence).")
+    else:
+        # For LangGraph API mode, don't provide a checkpointer
+        app = workflow.compile()
+        logger.info("Agent graph compiled (Milestone 3 - Using LangGraph built-in persistence).")
+    
     return app
 
 # --- Main Agent Class (Simple Runner for Now) ---
 class PPAAgentRunner:
-    def __init__(self):
-        self.graph = build_agent_graph()
-        # Reset mock step counter on initialization
+    def __init__(self, use_persistence=True):
+        """Initialize the PPA Agent runner.
+        
+        Args:
+            use_persistence (bool): Whether to use SQLite persistence.
+        """
+        # Remove mock planner step data if present (for clean testing)
         if hasattr(planner_node, "mock_step"):
              del planner_node.mock_step
 
+        # Create the graph with appropriate persistence setting
+        self.graph = build_agent_graph(use_persistence=use_persistence)
 
-    def run(self, initial_message: str):
-        logger.info(f"--- Starting Agent Run (Input: '{initial_message}') ---")
-        # Initial state for a new conversation
-        initial_state = AgentState(messages=[HumanMessage(content=initial_message)])
-        # No config needed yet as no persistence/thread_id
+    def run_turn(self, thread_id: str, user_input: Optional[str] = None):
+        """Runs a single turn for a given thread_id."""
+        logger.info(f"--- Running Agent Turn (Thread: {thread_id}) ---")
+        if user_input:
+             logger.info(f"Input: '{user_input}'")
+
+        # Prepare input message list if user input is provided
+        input_messages = []
+        if user_input:
+            input_messages.append(HumanMessage(content=user_input))
+
+        # Configuration includes the thread_id
+        config = {"configurable": {"thread_id": thread_id}}
 
         final_state_dict = {}
         try:
-            # Use stream or invoke - invoke returns final state
-            for step in self.graph.stream(initial_state):
+            # The checkpointer handles loading state based on thread_id
+            # Providing input adds the new message(s) to the loaded state
+            for step in self.graph.stream({"messages": input_messages}, config=config):
                 step_name = list(step.keys())[0]
                 step_data = list(step.values())[0]
                 logger.info(f"Step: {step_name}")
                 # logger.debug(f"Step Data: {step_data}")
-                final_state_dict = step_data # Keep track of the latest full state
+                final_state_dict = step_data
 
-            logger.info("--- Agent Run Complete ---")
-            final_state = AgentState(**final_state_dict) # Convert back for type hints
-            logger.info(f"Final Messages: {final_state.messages}")
-            logger.info(f"Final Customer Info: {final_state.customer_info}")
-            logger.info(f"Last Tool Outputs: {final_state.last_tool_outputs}")
-            return final_state
+            logger.info(f"--- Agent Turn Complete (Thread: {thread_id}) ---")
+            # Get the final state from the checkpointer for inspection
+            final_state_persisted = self.graph.get_state(config)
+            logger.info(f"Final Persisted Messages: {final_state_persisted.values['messages']}")
+            logger.info(f"Last Tool Outputs: {final_state_persisted.values['last_tool_outputs']}")
+            return final_state_persisted.values # Return the dict representation
 
         except Exception as e:
-             logger.error(f"Error during agent run: {e}", exc_info=True)
-             return AgentState(**final_state_dict) # Return state up to the error point
+             logger.error(f"Error during agent run (Thread: {thread_id}): {e}", exc_info=True)
+             try:
+                 # Try to get state even if run failed mid-way
+                 current_state = self.graph.get_state(config)
+                 return current_state.values
+             except Exception:
+                  logger.error(f"Could not retrieve state for thread {thread_id} after error.")
+                  return {"error": str(e)} # Return error dict
 
-# --- Compile graph at module level for direct execution/discovery ---
-graph = build_agent_graph()
+# --- Compile graphs at module level for different use cases ---
+# For standalone runs with persistence (e.g. run_agent.py)
+graph_with_persistence = build_agent_graph(use_persistence=True)
+
+# For LangGraph dev server (needs to be named 'graph' for discovery)
+graph = build_agent_graph(use_persistence=False)
