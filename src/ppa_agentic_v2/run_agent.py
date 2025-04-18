@@ -24,9 +24,9 @@ class MessageEncoder(json.JSONEncoder):
             }
         return super().default(obj)
 
-def print_state(state_dict, title):
+def print_state(state_dict, label):
     """Helper function to print state in a readable format"""
-    print(f"\n--- {title} ---")
+    print(f"\n--- {label} ---")
     
     # First try to convert messages to a readable format
     if "messages" in state_dict:
@@ -52,19 +52,56 @@ def print_state(state_dict, title):
     
     print("------")
 
-if __name__ == "__main__":
-    logger.info("--- Milestone 3: Persistent Agent Turn Test ---")
-    initial_email = "Hello, I need a PPA quote. My name is Alice."
+def main():
+    logger.info("--- Milestone 4: Real Planner with Tools Test ---")
+    
+    # Initialize Agent Runner (ensure it's defined here)
+    agent_runner = PPAAgentRunner(use_sqlite_persistence=True)
     thread_id = f"test-thread-{uuid.uuid4()}" # Create a unique thread ID for the test
+    logger.info(f"Initialized PPAAgentRunner for thread: {thread_id} (Persistence: True)")
+    
+    # Test customer initial query with driver and vehicle information
+    initial_email = """
+    Hello,
+    I need a quote for my car insurance.
+    My name is Alice Johnson, I'm 35 years old and live at 123 Main St, San Francisco, CA 94105. My DOB is 1990-01-15.
+    My car is a 2022 Toyota Camry, VIN: 12345ABCDEF67890.
+    Thanks,
+    Alice
+    """
+    
+    logger.info(f"Running first turn with customer information for thread {thread_id}...")
+    final_state_dict_1 = agent_runner.run_turn(thread_id=thread_id, user_input=initial_email)
+    print_state(final_state_dict_1, "Final State After Turn 1 (Initial Information)")
+    
+    # Test follow-up question
+    follow_up_question = "What deductible options do you offer?"
+    logger.info(f"Running second turn with follow-up question for thread {thread_id}...")
+    final_state_dict_2 = agent_runner.run_turn(thread_id=thread_id, user_input=follow_up_question)
+    print_state(final_state_dict_2, "Final State After Turn 2 (Follow-up Question)")
 
-    agent_runner = PPAAgentRunner()
+    # Test providing additional information
+    additional_info = "I also have another driver, my husband Bob, who is 38 years old."
+    logger.info(f"Running third turn with additional information for thread {thread_id}...")
+    final_state_dict_3 = agent_runner.run_turn(thread_id=thread_id, user_input=additional_info)
+    print_state(final_state_dict_3, "Final State After Turn 3 (Additional Driver Info)")
+    logger.info("\n------")
+    
+    # Return the runner so it can be closed
+    return agent_runner 
 
-    logger.info(f"Running first turn for thread {thread_id}...")
-    final_state_dict = agent_runner.run_turn(thread_id=thread_id, user_input=initial_email)
-
-    print_state(final_state_dict, "Final State (Dictionary) After Turn 1")
-
-    # Example of running a second turn in the same thread
-    print(f"\n--- Running second turn for thread {thread_id} (no new input) ---")
-    final_state_dict_2 = agent_runner.run_turn(thread_id=thread_id)
-    print_state(final_state_dict_2, "Final State (Dictionary) After Turn 2")
+if __name__ == "__main__":
+    runner_instance = None # Initialize to None
+    try:
+        # Execute the main logic and get the runner instance
+        runner_instance = main()
+    except Exception as e:
+        logger.error(f"An error occurred during the test run: {e}", exc_info=True)
+    finally:
+        # Ensure resources are cleaned up even if errors occur
+        # Check if runner_instance was successfully created before closing
+        if runner_instance and hasattr(runner_instance, 'close'):
+            logger.info("Closing agent runner resources...")
+            runner_instance.close() 
+        else:
+            logger.info("Agent runner not initialized or already closed.")

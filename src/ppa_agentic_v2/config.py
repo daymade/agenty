@@ -11,19 +11,18 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") # Preferred for google-genai
 
 # --- Model Selection ---
-# Prioritize Google API key if present
-DEFAULT_LLM_PROVIDER = "google" if GOOGLE_API_KEY else "openai"
+DEFAULT_LLM_PROVIDER = "openai"
 OPENAI_MODEL_NAME = os.getenv("OPENAI_MODEL_NAME", "gpt-4o")
-# Use a capable Gemini model - 1.5 Pro recommended for planning
 GOOGLE_MODEL_NAME = os.getenv("GOOGLE_MODEL_NAME", "gemini-2.5-pro-preview-03-25")
 
 # --- Logging ---
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
-# logging.basicConfig(
-#     level=LOG_LEVEL,
-#     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-#     datefmt="%Y-%m-%d %H:%M:%S",
-# )
+# Change default to DEBUG for more verbose logging during development
+LOG_LEVEL = os.getenv("LOG_LEVEL", "DEBUG").upper()
+logging.basicConfig(
+    level=LOG_LEVEL,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 logger = logging.getLogger(__name__)
 
 if not GOOGLE_API_KEY and not OPENAI_API_KEY:

@@ -18,12 +18,12 @@ class AgentState(BaseModel):
     """
     # == Conversation Context ==
     thread_id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique identifier for the conversation thread.")
-    goal: str = Field(default="Generate accurate PPA quote for the customer", description="The overall objective of the agent.")
+    goal: str = Field(default="Get a PPA insurance quote for the customer.", description="The overall objective of the agent.")
     # Use Annotated List[BaseMessage] for automatic message appending by LangGraph
     messages: Annotated[List[BaseMessage], operator.add] = Field(default_factory=list, description="Full history of messages (Human, AI, Tool).")
 
     # == Extracted & API Data ==
-    customer_info: Dict[str, Any] = Field(default_factory=dict, description="Accumulated structured data about customer, drivers, vehicles etc.")
+    customer_info: Optional[Dict[str, Any]] = Field(default=None, description="Accumulated structured data about customer, drivers, vehicles etc.")
     mercury_session: Optional[Dict[str, Any]] = Field(default=None, description="Stores context from Mercury APIs (e.g., Quote ID, session tokens).")
 
     # == Agent Planning & Execution State ==
@@ -34,7 +34,10 @@ class AgentState(BaseModel):
     # == HITL Control Flags & Feedback ==
     requires_agency_review: bool = Field(default=False, description="Set by Planner if the planned action in 'planned_tool_inputs' needs human review before execution.")
     awaiting_customer_reply: bool = Field(default=False, description="Set by Planner *before* triggering the 'Wait for Customer' interrupt.")
-    human_feedback: Optional[HumanFeedback] = Field(default=None, description="Feedback received from the Agency Review interrupt. Processed and cleared by the Planner.")
+    human_feedback: Optional[Dict[str, Any]] = Field(default=None, description="Feedback received from the Agency Review interrupt. Processed and cleared by the Planner.")
+
+    # == Loop Counter ==
+    loop_count: int = Field(default=0, description="Loop counter, defaults to 0.")
 
     # Allow arbitrary types for LangChain messages etc.
     class Config:
