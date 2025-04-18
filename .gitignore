@@ -60,3 +60,6 @@ test_outputs/
 
 # Un-ignore specific log file needed for debugging
 #!agent.log
+
+# LangGraph Checkpoints
+.langgraph*/

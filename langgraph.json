@@ -1,0 +1,10 @@
+{
+  "graphs": {
+    "ppa_agent_v2": "src.ppa_agentic_v2.agent:graph"
+  },
+  "env": "./.env",
+  "python_version": "3.11",
+  "dependencies": [
+    "."
+  ]
+}
