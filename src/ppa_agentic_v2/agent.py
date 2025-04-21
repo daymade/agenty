@@ -53,175 +53,192 @@ except Exception as e:
 
 # --- Planner Prompt Template --- 
 # Define the system prompt instructing the LLM
-def planner_node(state: AgentState) -> Dict[str, Any]:
-    """
-    The core planning node. Uses LLM to decide the next action based on state,
-    including history, tool outputs, and human feedback. Outputs JSON.
-    """
-    logger.info("--- Entering Planner Node (V3 Logic) ---")
-    update: Dict[str, Any] = {}
+async def planner_node(state: AgentState) -> Dict[str, Any]:
+    logger.info("--- Entering Planner Node ---")
+    update: Dict[str, Any] = {
+        "agent_scratchpad": "", # Default empty unless LLM provides one
+        "requires_agency_review": False, # Default unless LLM or logic sets it
+        "planned_tool_inputs": None, # Default unless LLM sets it or approval keeps it
+        "human_feedback": None, # Always clear feedback after processing
+        "last_tool_outputs": None # Default unless feedback/LLM sets it
+    }
+    prompt_input_messages = [] 
+    current_tool_outputs = None
+    call_llm = True # Flag to control whether to call LLM at the end
 
-    # Check if LLM initialized correctly
-    if not llm_with_tools: 
-        logger.error("LLM with tools not initialized. Cannot proceed with planning.")
-        update["agent_scratchpad"] = "Internal error: Planner LLM not available."
-        update["requires_agency_review"] = True
-        update["planned_tool_inputs"] = None
-        update["last_tool_outputs"] = None 
-        update["human_feedback"] = None 
-        return update
+    # --- Handle Post-Review State --- #
+    if state.human_feedback:
+        logger.info("Planner processing human feedback from previous step.")
+        feedback = state.human_feedback
+        approved = feedback.get("approved", False)
+        comment = feedback.get("comment", "")
+        planned_action = state.planned_tool_inputs # Action planned *before* review
+        tool_name_reviewed = planned_action.get("tool_name", "unknown") if planned_action else "unknown"
 
-    # --- Prepare Prompt using V3 Formatter ---
-    try:
-        formatted_prompt = format_planner_prompt(state, all_tools)
-        logger.debug(f"Formatted Planner Prompt V3:\n{formatted_prompt}")
-    except Exception as e:
-        logger.error(f"Error formatting planner prompt: {e}", exc_info=True)
-        update["agent_scratchpad"] = f"Internal error: Failed to format prompt - {e}"
-        update["requires_agency_review"] = True 
-        update["planned_tool_inputs"] = None
-        update["last_tool_outputs"] = None
-        update["human_feedback"] = None
-        return update
-
-    # --- Invoke LLM ---
-    logger.info("Invoking LLM planner...")
-    raw_llm_output = ""
-    parsed_data: Optional[Dict[str, Any]] = None
-    try:
-        llm_response = llm_with_tools.invoke(formatted_prompt)
-
-        if isinstance(llm_response, AIMessage) and llm_response.content:
-            raw_llm_output = llm_response.content
-            logger.debug(f"Raw LLM Output:\n{raw_llm_output}")
-
-            json_block_match = re.search(r"```json\n(.*?)\n```", raw_llm_output, re.DOTALL)
-            if json_block_match:
-                json_str = json_block_match.group(1).strip()
-            else:
-                json_str = raw_llm_output.strip()
-
-            parsed_data = json.loads(json_str)
-            logger.info(f"Successfully parsed LLM JSON: {parsed_data}")
-
-        else:
-            raise ValueError(f"Unexpected LLM response format: {type(llm_response)}")
-
-    except (json.JSONDecodeError, TypeError, ValueError) as e:
-        logger.error(f"Failed to parse LLM JSON output: {e}", exc_info=True)
-        logger.error(f"Raw LLM output was: {raw_llm_output}")
-        update["agent_scratchpad"] = f"Error: Failed to parse planner JSON response. Raw: {raw_llm_output}"
-        update["requires_agency_review"] = True
-        update["planned_tool_inputs"] = None
-
-    except OutputParserException as e: 
-        logger.error(f"LangChain OutputParserException from LLM: {e}", exc_info=True)
-        update["agent_scratchpad"] = f"Error: LLM output parsing failed. Details: {e}"
-        update["requires_agency_review"] = True
-        update["planned_tool_inputs"] = None
-
-    except Exception as e: 
-        logger.error(f"Unexpected error invoking planner LLM: {e}", exc_info=True)
-        update["agent_scratchpad"] = f"Internal error: Planner invocation failed - {e}"
-        update["requires_agency_review"] = True
-        update["planned_tool_inputs"] = None
-
-
-    if parsed_data:
-        update["agent_scratchpad"] = parsed_data.get("thought", "No thought provided.")
-        update["requires_agency_review"] = bool(parsed_data.get("requires_review", False))
-
-        tool_name = parsed_data.get("tool_name")
-        args = parsed_data.get("args") 
-
-        if tool_name:
-            update["planned_tool_inputs"] = {
-                "tool_name": tool_name,
-                "args": args if args is not None else {} 
+        if approved:
+            logger.info(f"Action '{tool_name_reviewed}' approved by human. Routing to executor.")
+            # Keep the previously planned action but mark review as done
+            update["planned_tool_inputs"] = planned_action 
+            update["requires_agency_review"] = False # Approved, no need for review *again*
+            update["last_tool_outputs"] = {"status": "approved_by_human", "tool_name": tool_name_reviewed, "message": comment}
+            update["human_feedback"] = None # Consume feedback
+            call_llm = False # Skip LLM call, proceed directly to execution via conditional edge
+            
+        else: # Rejected
+            logger.info(f"Action '{tool_name_reviewed}' rejected by human. Replanning needed.")
+            current_tool_outputs = { # This becomes input for replanning prompt
+                "status": "rejected_by_human",
+                "message": comment or "Action rejected by human review.",
+                "tool_name": tool_name_reviewed
             }
-            logger.info(f"Planner decided action: {tool_name} with args: {update['planned_tool_inputs']['args']}")
-            logger.info(f"Requires Agency Review: {update['requires_agency_review']}")
-        else:
-            update["planned_tool_inputs"] = None
-            logger.info("Planner decided no tool action needed.")
-            if "requires_agency_review" not in update: 
-                update["requires_agency_review"] = False
+            update["last_tool_outputs"] = current_tool_outputs # Record rejection as last output
+            update["planned_tool_inputs"] = None # Clear the rejected plan
+            update["requires_agency_review"] = False # No action planned yet
+            update["human_feedback"] = None # Consume feedback
+            # Let call_llm remain True to proceed to LLM replanning below
+            prompt_input_messages = format_planner_prompt(state, all_tools, current_tool_outputs=current_tool_outputs, human_feedback_str=None)
 
-    update["last_tool_outputs"] = None 
-    update["human_feedback"] = None 
-
-    logger.info(f"--- Exiting Planner Node. State updates: { {k: v for k, v in update.items() if v is not None} } ---")
-    return update
-
-def executor_node_wrapper(state: AgentState) -> Dict[str, Any]:
-    """
-    Executes the tool specified in state.planned_tool_inputs.
-    Handles errors and updates state with the result and clears the plan.
-    """
-    logger.info("--- Entering Executor Node Wrapper ---")
-    update: Dict[str, Any] = {}
-    tool_result: Optional[Dict[str, Any]] = None 
-
-    planned_inputs = state.planned_tool_inputs
-    if not planned_inputs or not planned_inputs.get("tool_name"):
-        logger.warning("Executor node called without planned_tool_inputs. No action taken.")
-        update["last_tool_outputs"] = {
-            "status": "error",
-            "error_message": "Executor called without a planned tool."
-        }
-        update["planned_tool_inputs"] = None 
-        return update
-
-    tool_name = planned_inputs["tool_name"]
-    tool_args = planned_inputs.get("args", {}) 
-
-    logger.info(f"Attempting to execute tool: {tool_name} with args: {tool_args}")
-
-    tool_to_execute = None
-    for tool in all_tools:
-        if tool.name == tool_name:
-            tool_to_execute = tool
-            break
-
-    if not tool_to_execute:
-        logger.error(f"Tool '{tool_name}' planned but not found in available tools.")
-        tool_result = {
-            "status": "error",
-            "error_message": f"Tool '{tool_name}' not found.",
-            "tool_name": tool_name 
-        }
-    else:
+    # --- Standard Planner Logic or Replanning after Rejection --- # 
+    if call_llm:
+        if not prompt_input_messages: # If not already set by rejection handling
+             logger.info("Planner running standard logic (no feedback to process or approved action).")
+             # Use state.last_tool_outputs from the *previous* node (e.g., executor)
+             current_tool_outputs = state.last_tool_outputs
+             prompt_input_messages = format_planner_prompt(state, all_tools, current_tool_outputs=current_tool_outputs, human_feedback_str=None)
+        
+        # --- Invoke LLM --- #
         try:
-            output = tool_to_execute.invoke(tool_args)
-            logger.info(f"Tool '{tool_name}' executed successfully. Output type: {type(output)}")
-            logger.debug(f"Tool '{tool_name}' raw output: {output}")
-            tool_result = {
-                "status": "success",
-                "output": output, 
-                "tool_name": tool_name
-            }
+            logger.debug(f"Planner Prompt Messages: {prompt_input_messages}")
+            response = await llm_with_tools.ainvoke(prompt_input_messages)
+            logger.debug(f"LLM Response: {response.content}")
 
+            # --- Parse LLM Output --- # 
+            parsed_output = None
+            if isinstance(response.content, str):
+                raw_llm_output = response.content
+                json_block_match = re.search(r"```json\n(.*?)\n```", raw_llm_output, re.DOTALL)
+                if json_block_match:
+                    json_str = json_block_match.group(1).strip()
+                else:
+                    json_str = raw_llm_output.strip()
+                
+                try:
+                    parsed_output = json.loads(json_str)
+                    logger.info(f"Successfully parsed LLM JSON: {parsed_output}")
+                except json.JSONDecodeError as json_e:
+                    logger.error(f"Failed to parse JSON from LLM output: {json_e}")
+                    logger.debug(f"LLM Raw output that failed parsing: {raw_llm_output}")
+                    raise OutputParserException(f"LLM output could not be parsed as JSON. Raw: {raw_llm_output}") from json_e
+            else:
+                 logger.error(f"Unexpected LLM response content type: {type(response.content)}")
+                 raise OutputParserException(f"Unexpected LLM response content type: {type(response.content)}")
+
+            if not isinstance(parsed_output, dict):
+                logger.error(f"Parsed output is not a dictionary: {parsed_output}")
+                raise OutputParserException(f"Parsed output is not a dictionary: {parsed_output}")
+
+            # --- Update State Based on LLM Output --- #
+            update["agent_scratchpad"] = parsed_output.get("thought", "")
+            # Update requires_review based on *this new plan* from LLM
+            update["requires_agency_review"] = parsed_output.get("requires_review", False) 
+
+            tool_name = parsed_output.get("tool_name")
+            if tool_name and tool_name != "final_answer":
+                update["planned_tool_inputs"] = {
+                    "tool_name": tool_name,
+                    "args": parsed_output.get("args", {})
+                }
+                logger.info(f"Planner planned tool: {tool_name} with review required: {update['requires_agency_review']}")
+            else:
+                logger.info("Planner decided final_answer or no tool action needed.")
+                update["planned_tool_inputs"] = None # Ensure it's cleared
+                update["requires_agency_review"] = False # No review needed if no tool planned
+
+        except (OutputParserException, ValidationError, json.JSONDecodeError) as e:
+            logger.error(f"Error parsing planner output: {e}")
+            update["agent_scratchpad"] = f"Error: Could not parse LLM output. Error: {e}. Raw output: {response.content if 'response' in locals() else 'N/A'}"
+            update["requires_agency_review"] = True # Force review if parsing fails
+            update["planned_tool_inputs"] = None 
+        except Exception as e:
+            logger.error(f"Unexpected error in planner node: {e}", exc_info=True)
+            update["agent_scratchpad"] = f"Error: An unexpected error occurred in the planner. Error: {e}"
+            update["requires_agency_review"] = True # Force review on unexpected errors
+            update["planned_tool_inputs"] = None
+
+    # Filter out None values before logging and returning
+    final_update = {k: v for k, v in update.items() if v is not None}
+    logger.info(f"--- Exiting Planner Node. State updates: {final_update} ---")
+    return final_update
+
+
+async def executor_node_wrapper(state: AgentState) -> Dict[str, Any]:
+    """Executes the tool specified in state.planned_tool_inputs.
+    This node is now ONLY called when the planner decides to execute a tool
+    AND does NOT require agency review.
+    """
+    logger.info("--- Entering Executor Node Wrapper (Review NOT Required) ---")
+    planned_tool_inputs = state.planned_tool_inputs
+
+    if not planned_tool_inputs or not isinstance(planned_tool_inputs, dict):
+        logger.warning("Executor called without valid planned_tool_inputs.")
+        return {"last_tool_outputs": {"status": "error", "message": "No tool planned for execution."}}
+
+    tool_name = planned_tool_inputs.get("tool_name")
+    tool_args = planned_tool_inputs.get("args", {}) # Args might be empty
+
+    if not tool_name:
+        logger.error("Planned tool inputs missing 'tool_name'.")
+        return {"last_tool_outputs": {"status": "error", "message": "Tool name missing in plan."}}
+
+    logger.info(f"Executing tool (no review required): {tool_name} with args: {tool_args}")
+
+    if tool_name in TOOL_MAP:
+        selected_tool = TOOL_MAP[tool_name]
+        try:
+            # Ensure args are passed correctly, tool.ainvoke expects a dict
+            # If tool_args is None or not a dict, provide an empty dict
+            input_args = tool_args if isinstance(tool_args, dict) else {}
+            tool_result = await selected_tool.ainvoke(input_args)
+            logger.info(f"Tool '{tool_name}' executed successfully (no review). Result keys: {list(tool_result.keys()) if isinstance(tool_result, dict) else 'N/A'}")
+            update = {
+                "last_tool_outputs": tool_result,
+                "planned_tool_inputs": None, # Clear plan after execution
+                "agent_scratchpad": "", # Clear scratchpad
+                "human_feedback": None # Clear any lingering feedback
+            }
         except Exception as e:
             logger.error(f"Error executing tool '{tool_name}': {e}", exc_info=True)
-            tool_result = {
-                "status": "error",
-                "error_message": str(e),
-                "tool_name": tool_name
+            update = {
+                "last_tool_outputs": {"status": "error", "tool_name": tool_name, "message": f"Execution failed: {e}"},
+                "planned_tool_inputs": None,
+                "agent_scratchpad": "",
+                "human_feedback": None
             }
+    else:
+        logger.error(f"Tool '{tool_name}' not found in TOOL_MAP.")
+        update = {
+            "last_tool_outputs": {"status": "error", "tool_name": tool_name, "message": "Tool definition not found."},
+            "planned_tool_inputs": None,
+            "agent_scratchpad": "",
+            "human_feedback": None
+        }
 
-    update["last_tool_outputs"] = tool_result
-    update["planned_tool_inputs"] = None 
-
-    logger.info(f"--- Exiting Executor Node Wrapper. Result: {tool_result['status']} ---")
+    logger.info(f"--- Exiting Executor Node Wrapper. State updates: {update} ---")
     return update
 
 def agency_review_pause_node(state: AgentState) -> Dict[str, Any]:
-    """Placeholder node for the agency review interrupt point. Does nothing.
-    The graph pauses *before* this node is executed.
-    When resumed, the graph executes this node and proceeds to the next edge.
+    """Placeholder node for the agency review interrupt point.
+    The graph pauses *before* AND *after* this node when run in dev mode.
+    To simulate review:
+    1. Click 'Continue' on the first pause (before).
+    2. Manually edit the 'human_feedback' field in the state JSON in the UI
+       (e.g., {"approved": false, "comment": "Needs VIN"}).
+    3. Click 'Continue' on the second pause (after).
     """
-    logger.info("--- Entering Agency Review Pause Node (post-resume) ---")
-    # No state modification needed here, just passing through after resume
+    logger.info("--- Entering Agency Review Pause Node ---")
+    logger.info("Graph paused BEFORE this node. Click 'Continue' to proceed to the 'after' pause.")
+    logger.info("If simulating review, manually edit 'human_feedback' state *before* the SECOND 'Continue'.")
+    # No state modification needed here by the node itself.
     return {}
 
 def check_agency_review(state: AgentState) -> str:
@@ -276,13 +293,14 @@ def build_agent_graph() -> StateGraph:
         }
     )
 
-    workflow.add_edge(AGENCY_REVIEW_NODE_NAME, EXECUTOR_NODE_NAME)
+    workflow.add_edge(AGENCY_REVIEW_NODE_NAME, PLANNER_NODE_NAME)
     workflow.add_edge(EXECUTOR_NODE_NAME, PLANNER_NODE_NAME)
 
     app = workflow.compile(
-        interrupt_before=[AGENCY_REVIEW_NODE_NAME]
+        interrupt_before=[AGENCY_REVIEW_NODE_NAME],
+        interrupt_after=[AGENCY_REVIEW_NODE_NAME] # Add this interrupt
     )
-    logger.info("Agent graph V3 compiled with agency review interrupt.")
+    logger.info("Agent graph V3 compiled with agency review interrupt (before & after).")
     return app
 
 # --- Main Agent Class (Simple Runner for Now) ---

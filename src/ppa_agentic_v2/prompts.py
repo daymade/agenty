@@ -1,6 +1,7 @@
 # src/ppa_agentic_v2/prompts.py
 import json
-from typing import List, Any, TYPE_CHECKING
+from typing import List, Any, Optional, Dict
+from typing_extensions import TYPE_CHECKING
 
 # Use forward reference for AgentState to avoid circular import
 if TYPE_CHECKING:
@@ -66,8 +67,15 @@ Respond ONLY with a JSON object:
 Analyze the current state and provide your decision in the specified JSON format ONLY.
 """
 
-def format_planner_prompt(state: 'AgentState', tools: List[Any]) -> str:
-    """Formats the prompt for the planner LLM (V3 - includes feedback)."""
+def format_planner_prompt(
+    state: 'AgentState',
+    tools: List[Any],
+    current_tool_outputs: Optional[Dict[str, Any]] = None,
+    human_feedback_str: Optional[str] = None # Pass formatted feedback string directly
+) -> str:
+    """Formats the prompt for the planner LLM (V3 - includes feedback).
+    Uses explicitly passed tool outputs and feedback string for prompt generation.
+    """
     from .state import AgentState # Import locally for type hint if needed
     from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, BaseMessage # For type checking
 
@@ -91,27 +99,31 @@ def format_planner_prompt(state: 'AgentState', tools: List[Any]) -> str:
     # Ensure complex objects are serialized safely (e.g., handling non-serializable types)
     customer_info_str = json.dumps(state.customer_info or {}, indent=2, default=str)
     mercury_session_str = json.dumps(state.mercury_session or {}, indent=2, default=str)
-    last_tool_outputs_str = json.dumps(state.last_tool_outputs or {"status": "N/A"}, indent=2, default=str)
+    # Use the passed current_tool_outputs for the prompt
+    last_tool_outputs_str = json.dumps(current_tool_outputs or {"status": "N/A"}, indent=2, default=str)
 
-    # Format human feedback clearly
-    human_feedback_str = "None"
-    if state.human_feedback:
-        feedback = state.human_feedback
-        feedback_status = "approved" if feedback.get("approved", False) else "rejected"
-        feedback_comment = feedback.get("comment", "No comment provided.")
-        human_feedback_str = f"""IMPORTANT: Last plan was {feedback_status}.
-Human feedback: {feedback_comment}
-Consider this feedback when formulating your next plan."""
+    # Use the passed human_feedback_str directly
+    final_human_feedback_str = human_feedback_str if human_feedback_str is not None else "None"
+    # --- Previous logic for formatting feedback from state (now handled in planner node) --- #
+    # human_feedback_str = "None"
+    # if state.human_feedback:
+    #     feedback = state.human_feedback
+    #     feedback_status = "approved" if feedback.get("approved", False) else "rejected"
+    #     feedback_comment = feedback.get("comment", "No comment provided.")
+    #     human_feedback_str = f"Status: {feedback_status}. Comment: {feedback_comment}"
+    # --- End previous logic --- #
 
-    tools_str = "\n".join([f"- {tool.name}: {tool.description}. Args schema: {tool.args_schema.schema() if tool.args_schema else '{}'}" for tool in tools])
+    # Format tools for the prompt
+    tools_str = "\n".join([f"- {tool.name}: {tool.description}" for tool in tools])
 
+    # Prepare the final prompt
     prompt = PLANNER_PROMPT_TEMPLATE_V3.format(
-        goal=state.goal,
+        goal=state.goal or "Process the PPA insurance quote request.",
         messages_str=messages_str,
         customer_info_str=customer_info_str,
         mercury_session_str=mercury_session_str,
         last_tool_outputs_str=last_tool_outputs_str,
-        human_feedback_str=human_feedback_str, # <-- Include formatted feedback
+        human_feedback_str=final_human_feedback_str, # Use the variable holding the final string
         tools_str=tools_str
     )
     return prompt
