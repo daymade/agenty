@@ -7,7 +7,7 @@ from typing_extensions import TYPE_CHECKING
 if TYPE_CHECKING:
     from .state import AgentState
 
-# --- Planner Prompt V3 (Adds Human Feedback Handling & Review Decision) ---
+# --- Planner Prompt V3 (Simplified - Relies on OpenAI Tool Calling) ---
 PLANNER_PROMPT_TEMPLATE_V3 = """
 You are a PPA Insurance Quoting Agent assistant. Your primary goal is: {goal}.
 You interact with the customer via messages and use internal tools to call Mercury Insurance APIs.
@@ -32,49 +32,53 @@ Based on the current state, conversation, AND HUMAN FEEDBACK (if provided), deci
 1.  **Process Human Feedback:** If feedback exists (not 'None'), **you MUST address it**. Re-evaluate your previous plan based on the comment or use the edited inputs if provided. Do NOT repeat the rejected action without changes unless the feedback allows it.
 2.  **Analyze State & Goal:** Review history, current data, goal, and last action result. What's the next logical step in the quoting sequence (e.g., Initiate -> Add Driver -> Add Vehicle -> Rate -> Summarize)? Handle errors from the last step.
 3.  **Determine Next Step & Formulate Plan:**
-    *   If ready to call an API or summarize: Choose the tool and generate exact `args`.
-    *   If customer information is needed: Plan to use `ask_customer_tool` with specific `missing_fields`.
-    *   If stuck or error unrecoverable: Plan `request_human_review_tool` (if available and necessary).
-    *   If goal met: Plan `prepare_final_summary_tool` or indicate completion (`tool_name: null`).
-4.  **Decide on Agency Review:** Set `requires_review` to `true` if the PLANNED action needs human review before execution (e.g., policy dictates review for `ask_customer_tool`, `rate_quote_tool`, or if you are uncertain). Otherwise, set `requires_review` to `false`.
+    *   If ready to call an API or summarize: Use the appropriate tool with the correct arguments.
+    *   If customer information is needed: Use the `ask_customer_tool` with specific `missing_fields`.
+    *   **IMPORTANT WAIT CONDITION:** If the 'Result of the VERY LAST Action Taken' indicates `ask_customer_tool` was successfully executed, your ONLY valid next step is to wait for the customer response. State clearly that you are waiting. Do NOT use any other tool.
+    *   If stuck or error unrecoverable: Use `request_human_review_tool` (if available and necessary).
+    *   If goal met: Use `prepare_final_summary_tool` or indicate completion in your response.
 
 **Available Tools:**
+```json
+{tool_schemas_json}
+```
+*IMPORTANT*: When specifying a tool in your action, use ONLY the base tool name listed above (e.g., "ask_customer_tool", "initiate_quote_tool"), not the fully qualified name.
 
-{tools_str}
+**Agent Graph Structure (Mermaid Syntax):**
+```mermaid
+{graph_mermaid_syntax}
+```
 
-**Output Format:**
+Based on your analysis, please respond with a JSON object in the following format:
 
-Respond ONLY with a JSON object:
 ```json
 {{
-  "thought": "Detailed reasoning, including how you processed human feedback (if any) and why you chose this action and review requirement.",
-  "requires_review": true | false, // Does THIS planned action need agency review?
-  "tool_name": "Name of the tool to use OR null.",
-  "args": {{ ... }} // Args for the tool OR null.
+  "thought": "<Your step-by-step reasoning for the chosen action, addressing goals, history, and feedback>",
+  "action": {{
+    "tool_name": "<name_of_tool_to_use>",
+    "tool_inputs": {{
+      "<argument_name>": "<argument_value>",
+      ...
+    }}
+  }}
+  // OR, if waiting for customer:
+  // "action": "WAIT_FOR_CUSTOMER"
 }}
 ```
 
-**Example (Processing Rejection):**
-```json
-{{
-  "thought": "The human agent rejected the previous plan to call 'add_vehicle_tool' with VIN '123', commenting 'VIN is incorrect'. I must ask the customer for the correct VIN instead.",
-  "requires_review": true, // Asking the customer always requires review by policy
-  "tool_name": "ask_customer_tool",
-  "args": {{ "missing_fields": ["vehicle_vin"] }}
-}}
-```
+**Instructions:** Fill the `thought` field with your reasoning. Then, based on that reasoning, either populate the `action` field with the tool call details (using the *short* tool name) OR set the `action` field to the exact string `"WAIT_FOR_CUSTOMER"` if you determined waiting is the correct next step.
 
-Analyze the current state and provide your decision in the specified JSON format ONLY.
 """
 
 def format_planner_prompt(
     state: 'AgentState',
     tools: List[Any],
     current_tool_outputs: Optional[Dict[str, Any]] = None,
-    human_feedback_str: Optional[str] = None # Pass formatted feedback string directly
+    human_feedback_str: Optional[str] = None, # Pass formatted feedback string directly
+    graph_mermaid_syntax: Optional[str] = None # Pass mermaid syntax for graph
 ) -> str:
-    """Formats the prompt for the planner LLM (V3 - includes feedback).
-    Uses explicitly passed tool outputs and feedback string for prompt generation.
+    """Formats the prompt for the planner LLM (V3 - includes feedback & graph diagram).
+    Uses explicitly passed tool outputs, feedback string, and mermaid syntax for prompt generation.
     """
     from .state import AgentState # Import locally for type hint if needed
     from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, BaseMessage # For type checking
@@ -113,8 +117,14 @@ def format_planner_prompt(
     #     human_feedback_str = f"Status: {feedback_status}. Comment: {feedback_comment}"
     # --- End previous logic --- #
 
-    # Format tools for the prompt
-    tools_str = "\n".join([f"- {tool.name}: {tool.description}" for tool in tools])
+    # Format tool schemas for the prompt
+    tool_schemas = {}
+    for tool in tools:
+        if hasattr(tool, 'args_schema') and hasattr(tool.args_schema, 'schema'):
+            tool_schemas[tool.name] = tool.args_schema.schema()
+        else:
+            tool_schemas[tool.name] = {} # Tool has no args
+    tool_schemas_json = json.dumps(tool_schemas, indent=2)
 
     # Prepare the final prompt
     prompt = PLANNER_PROMPT_TEMPLATE_V3.format(
@@ -123,8 +133,9 @@ def format_planner_prompt(
         customer_info_str=customer_info_str,
         mercury_session_str=mercury_session_str,
         last_tool_outputs_str=last_tool_outputs_str,
-        human_feedback_str=final_human_feedback_str, # Use the variable holding the final string
-        tools_str=tools_str
+        human_feedback_str=final_human_feedback_str,
+        tool_schemas_json=tool_schemas_json,
+        graph_mermaid_syntax=graph_mermaid_syntax or "Graph not available",
     )
     return prompt
 

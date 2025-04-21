@@ -35,6 +35,7 @@ class AgentState(BaseModel):
     requires_agency_review: bool = Field(default=False, description="Set by Planner if the planned action in 'planned_tool_inputs' needs human review before execution.")
     awaiting_customer_reply: bool = Field(default=False, description="Set by Planner *before* triggering the 'Wait for Customer' interrupt.")
     human_feedback: Optional[Dict[str, Any]] = Field(default=None, description="Feedback received from the Agency Review interrupt. Processed and cleared by the Planner.")
+    wait_signal: bool = Field(default=False, description="Explicit signal that the next step is to wait for customer input.")
 
     # == Loop Counter ==
     loop_count: int = Field(default=0, description="Loop counter, defaults to 0.")
@@ -64,6 +65,7 @@ class AgentState(BaseModel):
             "requires_agency_review": False,
             "awaiting_customer_reply": False,
             "human_feedback": None, # Ensure feedback is cleared after processing
-            "agent_scratchpad": None # Optional: clear scratchpad each cycle?
+            "agent_scratchpad": None, # Optional: clear scratchpad each cycle?
+            "wait_signal": False
         }
         return self.update_state(updates)

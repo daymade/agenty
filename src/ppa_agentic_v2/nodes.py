@@ -8,7 +8,7 @@ from typing import List, Dict, Any, Optional, Tuple
 from langchain_core.messages import BaseMessage
 from pydantic import ValidationError
 from langchain_core.exceptions import OutputParserException
-
+from langgraph.constants import Interrupt
 from .state import AgentState
 from .tools import all_tools, TOOL_MAP
 from .config import logger
@@ -109,21 +109,37 @@ async def _invoke_llm_and_parse(state: AgentState, prompt_input_messages: Option
             raise OutputParserException(f"Parsed output is not a dictionary: {parsed_output}")
 
         # --- Update State Based on LLM Output --- #
-        update["agent_scratchpad"] = parsed_output.get("thought", "")
-        # Update requires_review based on *this new plan* from LLM
-        update["requires_agency_review"] = parsed_output.get("requires_review", False)
+        update["agent_scratchpad"] = parsed_output.get("thought", "") # Extract thought process
+        action_details = parsed_output.get("action")
 
-        tool_name = parsed_output.get("tool_name")
-        if tool_name and tool_name != "final_answer":
-            update["planned_tool_inputs"] = {
-                "tool_name": tool_name,
-                "args": parsed_output.get("args", {})
-            }
-            logger.info(f"Planner planned tool: {tool_name} with review required: {update['requires_agency_review']}")
+        # Reset plan and review status initially
+        update["planned_tool_inputs"] = None
+
+        if isinstance(action_details, str) and action_details == "WAIT_FOR_CUSTOMER":
+            logger.info("Planner decided to wait for customer response.")
+            # No tool is planned, the graph will route to CUSTOMER_WAIT_NODE based on check_planner_output
+            # We might need a flag in the state if check_planner_output needs it, but the interrupt should handle the pause.
+            pass # planned_tool_inputs remains None
+
+        elif isinstance(action_details, dict):
+            tool_name = action_details.get("tool_name")
+            tool_inputs = action_details.get("tool_inputs", {})
+            if tool_name:
+                update["planned_tool_inputs"] = {
+                    "tool_name": tool_name,
+                    "args": tool_inputs # Use 'args' key consistent with executor node
+                }
+                logger.info(f"Planner planned tool: {tool_name}")
+                # Note: Review requirement is now determined by check_planner_output
+            else:
+                logger.warning("LLM action dictionary is missing 'tool_name'. Treating as no action.")
+                # planned_tool_inputs remains None
+
         else:
-            logger.info("Planner decided final_answer or no tool action needed.")
-            update["planned_tool_inputs"] = None # Ensure it's cleared
-            update["requires_agency_review"] = False # No review needed if no tool planned
+            logger.error(f"LLM 'action' field has unexpected format: {action_details}. Treating as no action.")
+            # planned_tool_inputs remains None
+            # Consider forcing review here if this happens often
+            # update["requires_agency_review"] = True
 
     except (OutputParserException, ValidationError, json.JSONDecodeError) as e:
         logger.error(f"Error processing planner LLM output: {e}")
@@ -203,14 +219,15 @@ async def execute_tool_no_review(state: AgentState) -> Dict[str, Any]:
             tool_output = {"status": "error", "tool_name": tool_name, "message": f"Error executing tool {tool_name}: {str(e)}"}
     else:
         logger.error(f"Tool '{tool_name}' not found in TOOL_MAP.")
-        tool_output = {"status": "error", "tool_name": tool_name, "message": f"Tool '{tool_name}' is not implemented or mapped."}
+        tool_output = {"status": "error", "message": f"Tool '{tool_name}' not recognized."}
 
-    logger.info(f"--- Exiting Executor Node (No Review Required). Output: {tool_output} ---")
-    # Return only the tool output to be stored in 'last_tool_outputs'
-    return {"last_tool_outputs": tool_output}
+    # Clear the plan after execution attempt (success or failure)
+    return {"last_tool_outputs": tool_output, "planned_tool_inputs": None}
 
-def agency_review_pause_node(state: AgentState) -> Dict[str, Any]:
+
+async def agency_review_pause_node(state: AgentState) -> Interrupt:
     """Placeholder node for the agency review interrupt point.
+
     The graph pauses *before* AND *after* this node when run in dev mode.
     To simulate review:
     1. Click 'Continue' on the first pause (before).
@@ -218,6 +235,20 @@ def agency_review_pause_node(state: AgentState) -> Dict[str, Any]:
        (e.g., {"approved": false, "comment": "Needs VIN"}).
     3. Click 'Continue' on the second pause (after).
     """
-    logger.info("--- Pausing for Agency Review --- ")
+    logger.info(f"--- Pausing for Agency Review (Interrupt). Planned Action: {state.planned_tool_inputs} ---")
     # No state modification needed here by the node itself.
-    return {}
+    # Feedback is added externally via API call.
+    return Interrupt(value=None)
+
+
+async def customer_wait_node(state: AgentState) -> Interrupt:
+    """Node to pause the graph while waiting for customer input.
+
+    The graph configuration uses this node as an interrupt point.
+    When the graph is resumed (presumably with updated 'messages' in the state),
+    it will proceed back to the planner.
+    """
+    logger.info("--- Pausing for Customer Input (Interrupt) ---")
+    # No state update needed here, just pausing.
+    # The actual message update happens externally via API call.
+    return Interrupt(value=None)

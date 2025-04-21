@@ -2,82 +2,119 @@
 
 import logging
 from langgraph.graph import StateGraph, END, START
-from langgraph.checkpoint.sqlite import SqliteSaver
-
+from langgraph.graph.state import CompiledStateGraph
 from .state import AgentState
-from .config import logger, SQLITE_DB_NAME
+# Import config values including node names
+from .config import (
+    logger,
+    SQLITE_DB_NAME,
+    PLANNER_NODE_NAME,
+    EXECUTOR_NO_REVIEW_NODE_NAME,
+    AGENCY_REVIEW_NODE_NAME,
+    CUSTOMER_WAIT_NODE_NAME
+)
 from .nodes import (
     planner_node,
     execute_tool_no_review,
-    agency_review_pause_node
+    agency_review_pause_node,
+    customer_wait_node
 )
 
-# --- Constants (Node Names) ---
-PLANNER_NODE_NAME = "planner"
-EXECUTOR_NO_REVIEW_NODE_NAME = "execute_tool_no_review"
-AGENCY_REVIEW_NODE_NAME = "agency_review_pause"
+# Define which tools require agency review before execution
+TOOLS_REQUIRING_REVIEW = {
+    # Add tool names that need human oversight
+    # Example: "initiate_quote_tool", "add_vehicle_tool"
+    "initiate_quote_tool" # Example - adjust as needed
+}
 
-# --- Conditional Edge Logic ---
-def check_agency_review(state: AgentState) -> str:
+# --- Conditional Edge Logic from Planner --- #
+def check_planner_output(state: AgentState) -> str:
     """
-    Conditional edge logic after the planner node.
-    Routes to review, execution, or end based on planner's decision.
+    Routes control based on the planner's decision stored in planned_tool_inputs.
+    - If no tool is planned, assumes LLM wants to wait for customer.
+    - If ask_customer_tool is planned, routes to wait.
+    - If another tool is planned, checks if it requires review.
     """
-    logger.info("--- Checking Agency Review Requirement --- ")
-    requires_review = state.requires_agency_review
-    planned_action = state.planned_tool_inputs
+    logger.info("--- Checking Planner Output for Routing ---")
+    planned_tool = state.planned_tool_inputs
 
-    if requires_review and planned_action:
-        logger.info("Routing to Agency Review Pause.")
-        return AGENCY_REVIEW_NODE_NAME # Route to the pause node
-    elif planned_action:
-        # Action planned, but no review needed
-        logger.info(f"Routing directly to Executor for tool: {planned_action.get('tool_name', 'unknown')}.")
-        return EXECUTOR_NO_REVIEW_NODE_NAME # Route to direct execution
+    if planned_tool is None:
+        # This occurs if the LLM explicitly outputted 'WAIT_FOR_CUSTOMER' action.
+        logger.info("No tool planned. Assuming wait for customer input. Routing to customer wait node.")
+        return CUSTOMER_WAIT_NODE_NAME
+
+    # Tool *is* planned
+    if isinstance(planned_tool, dict):
+        tool_name = planned_tool.get("tool_name")
+        if not tool_name:
+             logger.error("Planned tool inputs exist but missing 'tool_name'. Routing to END to prevent loop.")
+             return END # Avoid infinite loops if plan is malformed
+
+        logger.info(f"Planner decided to use tool: {tool_name}")
+
+        # Check against the fully qualified name the LLM seems to be using
+        if tool_name == "functions.ask_customer_tool":
+            logger.info("Tool is ask_customer_tool. Routing to customer wait node.")
+            return CUSTOMER_WAIT_NODE_NAME
+
+        if tool_name in TOOLS_REQUIRING_REVIEW:
+            logger.info(f"Tool '{tool_name}' requires review. Routing to agency review node.")
+            return AGENCY_REVIEW_NODE_NAME
+        else:
+            logger.info(f"Tool '{tool_name}' does not require review. Routing to execution node.")
+            return EXECUTOR_NO_REVIEW_NODE_NAME
     else:
-        # No action planned (e.g., final answer or error)
-        logger.info("No tool planned or final answer. Routing to End.")
+        # Should not happen if planner node works correctly, but handle defensively
+        logger.error(f"Planned tool inputs is not a dictionary or None: {planned_tool}. Routing to END.")
         return END
 
+
 # --- Build Agent Graph ---
-def build_agent_graph() -> StateGraph:
-    """Builds the LangGraph StateGraph for the PPA Agent (V3 with Agency Review)."""
-    memory = SqliteSaver.from_conn_string(SQLITE_DB_NAME)
-    workflow = StateGraph(AgentState)
+def build_agent_graph() -> CompiledStateGraph:
+    """Builds and compiles the LangGraph StateGraph for the PPA Agentic V2."""
+    logger.info("Building agent graph structure...")
+    graph = StateGraph(AgentState)
 
     # 1. Add Nodes
-    workflow.add_node(PLANNER_NODE_NAME, planner_node)
-    workflow.add_node(AGENCY_REVIEW_NODE_NAME, agency_review_pause_node)
-    workflow.add_node(EXECUTOR_NO_REVIEW_NODE_NAME, execute_tool_no_review) # Add the no-review executor
+    graph.add_node(PLANNER_NODE_NAME, planner_node) 
+    graph.add_node(EXECUTOR_NO_REVIEW_NODE_NAME, execute_tool_no_review) 
+    graph.add_node(AGENCY_REVIEW_NODE_NAME, agency_review_pause_node) 
+    graph.add_node(CUSTOMER_WAIT_NODE_NAME, customer_wait_node) 
 
     # 2. Define Edges
-    workflow.add_edge(START, PLANNER_NODE_NAME)
+    graph.add_edge(START, PLANNER_NODE_NAME)
 
     # Conditional edge from Planner based on review requirement
-    workflow.add_conditional_edges(
+    graph.add_conditional_edges(
         PLANNER_NODE_NAME,
-        check_agency_review,
+        check_planner_output,
         {
             AGENCY_REVIEW_NODE_NAME: AGENCY_REVIEW_NODE_NAME,
-            EXECUTOR_NO_REVIEW_NODE_NAME: EXECUTOR_NO_REVIEW_NODE_NAME, # Route to no-review executor
-            END: END
+            EXECUTOR_NO_REVIEW_NODE_NAME: EXECUTOR_NO_REVIEW_NODE_NAME, 
+            CUSTOMER_WAIT_NODE_NAME: CUSTOMER_WAIT_NODE_NAME, 
+            END: END,
         }
     )
 
     # Edge from Executor (No Review) back to Planner for next step
-    workflow.add_edge(EXECUTOR_NO_REVIEW_NODE_NAME, PLANNER_NODE_NAME)
+    graph.add_edge(EXECUTOR_NO_REVIEW_NODE_NAME, PLANNER_NODE_NAME)
 
     # Edge *after* Agency Review Pause (human provides feedback) back to Planner
-    # The graph pauses *after* the agency_review_pause_node. When resumed,
-    # it proceeds to the planner, which will then process the human_feedback.
-    workflow.add_edge(AGENCY_REVIEW_NODE_NAME, PLANNER_NODE_NAME)
+    graph.add_edge(AGENCY_REVIEW_NODE_NAME, PLANNER_NODE_NAME)
 
-    # 3. Compile the graph
-    # Use memory for persistence. Add interrupt points.
-    app = workflow.compile(
-        checkpointer=memory,
-        interrupt_before=[AGENCY_REVIEW_NODE_NAME],
-        interrupt_after=[AGENCY_REVIEW_NODE_NAME]
+    # Edge *after* Customer Wait Pause (new customer input) back to Planner
+    # The graph pauses *after* the customer_wait_node. When resumed,
+    # it proceeds to the planner, which will then process the new input (in messages).
+    # graph.add_edge(CUSTOMER_WAIT_NODE_NAME, PLANNER_NODE_NAME) # <-- REMOVED: Interrupt handles pause; resume implicitly restarts flow
+
+    logger.info("Agent graph structure defined (compilation deferred).")
+
+    # Compile the graph, specifying interrupt points
+    compiled_graph = graph.compile(
+        interrupt_before=[ # <-- Keep interrupt configuration
+            AGENCY_REVIEW_NODE_NAME,
+            CUSTOMER_WAIT_NODE_NAME,
+        ],
     )
-    logger.info("Agent graph compiled successfully with checkpointer and interrupts.")
-    return app
+    logger.info("Agent graph compiled with interrupt points.") 
+    return compiled_graph

@@ -42,5 +42,11 @@ PPA_QUOTE_REQUIREMENTS = [
     # Add any other essential fields identified by Mercury APIs
 ]
 
+# --- Agent/Graph Node Names (Centralized) ---
+PLANNER_NODE_NAME = "planner"
+EXECUTOR_NO_REVIEW_NODE_NAME = "execute_tool_no_review"
+AGENCY_REVIEW_NODE_NAME = "agency_review_pause"
+CUSTOMER_WAIT_NODE_NAME = "customer_wait"
+
 # --- Database for Persistence ---
-SQLITE_DB_NAME = "ppa_agent_state.sqlite"
+SQLITE_DB_NAME = "./ppa_agent_v2_checkpoints.sqlite"

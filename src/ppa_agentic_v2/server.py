@@ -22,11 +22,9 @@ import uuid # Added for thread ID management
 
 # Import necessary components from your agent code
 
-from src.ppa_agentic_v2.agent import build_agent_graph, AGENCY_REVIEW_NODE_NAME # Function that returns the compiled app, and the review node name
-
+from src.ppa_agentic_v2.agent import graph as app_agent
 from src.ppa_agentic_v2.state import AgentState # Your Pydantic state model
-
-from src.ppa_agentic_v2.config import logger # Use configured logger
+from src.ppa_agentic_v2.config import logger, AGENCY_REVIEW_NODE_NAME, CUSTOMER_WAIT_NODE_NAME # Use configured logger and node names
 
 # Import message types if needed for input schema
 from langchain_core.messages import HumanMessage, BaseMessage
@@ -39,11 +37,6 @@ app_fastapi = FastAPI(
     version="1.0",
     description="API server for the agentic PPA insurance quoting workflow (Milestone 2 - Mocked).",
 )
-
-# --- Agent Graph Initialization ---
-logger.info("Building agent graph...")
-app_agent = build_agent_graph()
-logger.info("Agent graph built.")
 
 # --- Input Schema for the API ---
 # Define Pydantic models for expected input and output
@@ -69,13 +62,12 @@ logger.info("Adding LangServe routes...")
 add_routes(
     app_fastapi,
     app_agent,
-    path="/ppa_agent",
+    path="/ppa_agent_v2",
     input_type=AgentInvokeInput, # Specify input type if needed
     output_type=AgentState, # Specify output type if needed
     enable_feedback_endpoint=True, # Optional: Enable feedback endpoint
     enable_public_trace_link_endpoint=True, # Optional: Enable public trace link endpoint
-    # playground_type="chat", # Use 'chat' playground type
-    # config_keys=["configurable"], # Example: Define configurable fields
+    config_keys=['configurable'], # Specify configurable fields
 )
 logger.info("LangServe routes added.")
 
@@ -95,8 +87,7 @@ async def get_thread_status(thread_id: str):
     try:
         state = await app_agent.aget_state(config)
         if not state:
-             logger.warning(f"No state found for thread_id: {thread_id}")
-             return ReviewStatusResponse(thread_id=thread_id, awaiting_review=False, error="Thread not found")
+            return ReviewStatusResponse(thread_id=thread_id, awaiting_review=False, error="Thread not found.")
         
         is_awaiting_review = state.next == (AGENCY_REVIEW_NODE_NAME,)
         planned_action = state.values.get("planned_tool_inputs") if is_awaiting_review else None
@@ -114,31 +105,31 @@ async def get_thread_status(thread_id: str):
 @app_fastapi.post("/threads/{thread_id}/review")
 async def submit_review(thread_id: str, review: ReviewInput):
     """Submits human feedback for a paused thread and resumes the agent."""
-    logger.info(f"Submitting review for thread_id: {thread_id}. Approved: {review.approved}")
+    logger.info(f"Submitting review for thread_id: {thread_id} - Approved: {review.approved}")
     config = {"configurable": {"thread_id": thread_id}}
     try:
-        # 1. Check if the thread is actually waiting for review
-        state = await app_agent.aget_state(config)
-        if not state or state.next != (AGENCY_REVIEW_NODE_NAME,):
-            logger.warning(f"Thread {thread_id} is not awaiting review. Current next: {state.next if state else 'None'}")
-            return {"message": "Thread is not currently awaiting review.", "status": "ignored"}
-        
-        # 2. Update the state with the human feedback
-        feedback_data = {"human_feedback": review.dict()}
-        await app_agent.aupdate_state(config, feedback_data)
-        logger.info(f"State updated with feedback for thread {thread_id}")
+        # Get current state to verify it's awaiting review
+        current_state = await app_agent.aget_state(config)
+        if not current_state:
+            raise HTTPException(status_code=404, detail="Thread not found.")
 
-        # 3. Resume the agent graph by streaming None input
-        # We don't necessarily need to collect the output here unless the UI needs it immediately
-        async for _ in app_agent.astream(None, config):
-            # Consume the stream to let the agent run its next step (the executor)
-            pass
-        logger.info(f"Agent resumed for thread {thread_id}")
-        return {"message": "Review submitted and agent resumed.", "status": "resumed"}
-    
-    except Exception as e:
-        logger.error(f"Error submitting review for thread {thread_id}: {e}", exc_info=True)
-        return {"message": f"Error submitting review: {str(e)}", "status": "error"}
+        # Simplified check: Assume if state exists, it *might* be waiting.
+        # A more robust check would involve inspecting current_state.values['agent_scratchpad'] or a specific flag.
+        # logger.debug(f"Current state for review check: {current_state.values}")
+
+        feedback_content = f"Review Comment: {review.comment}" if review.comment else "No comment."
+        human_feedback = f"HumanReviewDecision: {'Approved' if review.approved else 'Rejected'}\n{feedback_content}"
+
+        # Update the state with the feedback. The graph should handle resuming.
+        # The update_state method expects the *values* dictionary to update.
+        await app_agent.update_state(config, values={'human_feedback': human_feedback})
+
+        logger.info(f"Review submitted for thread {thread_id}. Agent should resume.")
+        return {"message": "Review submitted successfully. Agent processing resumed."} # Updated return value
+
+    except HTTPException as http_exc:
+        logger.error(f"HTTP Exception submitting review for thread {thread_id}: {http_exc}", exc_info=True)
+        return {"message": f"Error submitting review: {http_exc.detail}", "status": "error"}
 
 # --- CORS Middleware --- #
 # Allows requests from the playground, which is often served on a different port

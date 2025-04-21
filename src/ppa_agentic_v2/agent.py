@@ -1,10 +1,12 @@
 # src/ppa_agentic_v2/agent.py
 import logging
 import json
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Tuple, AsyncIterator
 from langgraph.graph import StateGraph, END, START
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, BaseMessage, SystemMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder 
+from langchain_core.runnables import RunnableConfig
+from langchain_core.tools import BaseTool, tool
 from pydantic import ValidationError, BaseModel, Field 
 from langgraph.prebuilt import ToolNode 
 from langgraph.checkpoint.sqlite import SqliteSaver
@@ -24,6 +26,7 @@ import re
 from langchain_core.exceptions import OutputParserException 
 from pydantic import ValidationError 
 from .llm_setup import llm, llm_with_tools # Import initialized LLMs
+from .graph import build_agent_graph, PLANNER_NODE_NAME, EXECUTOR_NO_REVIEW_NODE_NAME, AGENCY_REVIEW_NODE_NAME, CUSTOMER_WAIT_NODE_NAME, START, END # Import the correct build_agent_graph
 
 # --- Constants ---
 PLANNER_NODE_NAME = "planner"
@@ -75,296 +78,228 @@ def _handle_human_feedback(state: AgentState, update: Dict[str, Any]) -> Tuple[b
     return call_llm, prompt_input_messages, current_tool_outputs
 
 
-async def _invoke_llm_and_parse(state: AgentState, prompt_input_messages: Optional[List[BaseMessage]], current_tool_outputs: Optional[Dict[str, Any]], update: Dict[str, Any]):
-    """Invokes the LLM, parses the response, and updates the state update dict."""
-    if not llm_with_tools:
-        logger.error("LLM with tools not initialized. Cannot invoke planner LLM.")
-        update["agent_scratchpad"] = "Error: LLM not available."
-        update["requires_agency_review"] = True # Force review if LLM failed
-        update["planned_tool_inputs"] = None
-        return
+# --- Helper Function to get Tools ---
+def get_available_tools() -> List[BaseTool]:
+    """Returns the list of available tools for the agent."""
+    return all_tools
 
-    # Generate prompt if not provided (e.g., standard run, not after rejection)
-    if prompt_input_messages is None:
-        logger.info("Planner running standard logic (no feedback processed or action approved).")
-        # Use state.last_tool_outputs from the *previous* node (e.g., executor)
-        current_tool_outputs = state.last_tool_outputs
-        prompt_input_messages = format_planner_prompt(state, all_tools, current_tool_outputs=current_tool_outputs, human_feedback_str=None)
-
-    # --- Invoke LLM --- #
-    try:
-        logger.debug(f"Planner Prompt Messages: {prompt_input_messages}")
-        response = await llm_with_tools.ainvoke(prompt_input_messages)
-        logger.debug(f"LLM Response: {response.content}")
-
-        # --- Parse LLM Output --- #
-        parsed_output = None
-        if isinstance(response.content, str):
-            raw_llm_output = response.content
-            # Relaxed JSON parsing: Look for JSON block or try parsing directly
-            json_block_match = re.search(r"```json\n(.*?)\n```", raw_llm_output, re.DOTALL)
-            if json_block_match:
-                json_str = json_block_match.group(1).strip()
-            else:
-                # Try parsing the whole string if no block found
-                json_str = raw_llm_output.strip()
-
-            try:
-                parsed_output = json.loads(json_str)
-                logger.info(f"Successfully parsed LLM JSON: {parsed_output}")
-            except json.JSONDecodeError as json_e:
-                logger.error(f"Failed to parse JSON from LLM output: {json_e}")
-                logger.debug(f"LLM Raw output that failed parsing: {raw_llm_output}")
-                raise OutputParserException(f"LLM output could not be parsed as JSON. Raw: {raw_llm_output}") from json_e
-        else:
-            logger.error(f"Unexpected LLM response content type: {type(response.content)}")
-            raise OutputParserException(f"Unexpected LLM response content type: {type(response.content)}")
-
-        if not isinstance(parsed_output, dict):
-            logger.error(f"Parsed output is not a dictionary: {parsed_output}")
-            raise OutputParserException(f"Parsed output is not a dictionary: {parsed_output}")
-
-        # --- Update State Based on LLM Output --- #
-        update["agent_scratchpad"] = parsed_output.get("thought", "")
-        # Update requires_review based on *this new plan* from LLM
-        update["requires_agency_review"] = parsed_output.get("requires_review", False)
-
-        tool_name = parsed_output.get("tool_name")
-        if tool_name and tool_name != "final_answer":
-            update["planned_tool_inputs"] = {
-                "tool_name": tool_name,
-                "args": parsed_output.get("args", {})
-            }
-            logger.info(f"Planner planned tool: {tool_name} with review required: {update['requires_agency_review']}")
-        else:
-            logger.info("Planner decided final_answer or no tool action needed.")
-            update["planned_tool_inputs"] = None # Ensure it's cleared
-            update["requires_agency_review"] = False # No review needed if no tool planned
-
-    except (OutputParserException, ValidationError, json.JSONDecodeError) as e:
-        logger.error(f"Error processing planner LLM output: {e}")
-        update["agent_scratchpad"] = f"Error: Could not process LLM output. Error: {e}. Raw output: {response.content if 'response' in locals() else 'N/A'}"
-        update["requires_agency_review"] = True # Force review if parsing fails
-        update["planned_tool_inputs"] = None
-    except Exception as e:
-        logger.error(f"Unexpected error during planner LLM invocation/parsing: {e}", exc_info=True)
-        update["agent_scratchpad"] = f"Error: An unexpected error occurred in the planner LLM step. Error: {e}"
-        update["requires_agency_review"] = True # Force review on unexpected errors
-        update["planned_tool_inputs"] = None
-
-# --- Planner Node --- #
-async def planner_node(state: AgentState) -> Dict[str, Any]:
-    logger.info("--- Entering Planner Node ---")
-    update: Dict[str, Any] = {
-        "agent_scratchpad": state.agent_scratchpad, # Carry over previous thought unless updated
-        "requires_agency_review": False, # Default unless feedback/LLM sets it
-        "planned_tool_inputs": None, # Default unless feedback/LLM sets it or approval keeps it
-        "human_feedback": None, # Always clear feedback after processing
-        "last_tool_outputs": None # Default unless feedback/LLM sets it
-    }
-
-    # 1. Handle Human Feedback (if any)
-    call_llm, prompt_input_messages, current_tool_outputs = _handle_human_feedback(state, update)
-
-    # 2. Invoke LLM and Parse Output (if not bypassed by feedback handling)
-    if call_llm:
-        await _invoke_llm_and_parse(state, prompt_input_messages, current_tool_outputs, update)
-
-    # Filter out None values before logging and returning
-    final_update = {k: v for k, v in update.items() if v is not None}
-    logger.info(f"--- Exiting Planner Node. State updates: {final_update} ---")
-    return final_update
-
-# --- Executor Node (No Review Required) ---
-async def execute_tool_no_review(state: AgentState) -> Dict[str, Any]:
-    """Executes the tool specified in state.planned_tool_inputs.
-    This node is ONLY called when the planner decides to execute a tool
-    AND does NOT require agency review.
-    """
-    logger.info("--- Entering Executor Node (Review NOT Required) ---")
-    planned_tool_inputs = state.planned_tool_inputs
-
-    if not planned_tool_inputs or not isinstance(planned_tool_inputs, dict):
-        logger.warning("Executor called without valid planned_tool_inputs.")
-        return {"last_tool_outputs": {"status": "error", "message": "No tool planned for execution."}}
-
-    tool_name = planned_tool_inputs.get("tool_name")
-    tool_args = planned_tool_inputs.get("args", {}) # Args might be empty
-
-    if not tool_name:
-        logger.error("Planned tool inputs missing 'tool_name'.")
-        return {"last_tool_outputs": {"status": "error", "message": "Tool name missing in plan."}}
-
-    logger.info(f"Executing tool (no review required): {tool_name} with args: {tool_args}")
-
-    if tool_name in TOOL_MAP:
-        selected_tool = TOOL_MAP[tool_name]
-        try:
-            # Ensure args are passed correctly, tool.ainvoke expects a dict
-            # If tool_args is None or not a dict, provide an empty dict
-            input_args = tool_args if isinstance(tool_args, dict) else {}
-            tool_result = await selected_tool.ainvoke(input_args)
-            logger.info(f"Tool '{tool_name}' executed successfully (no review). Result keys: {list(tool_result.keys()) if isinstance(tool_result, dict) else 'N/A'}")
-            update = {
-                "last_tool_outputs": tool_result,
-                "planned_tool_inputs": None, # Clear plan after execution
-                "agent_scratchpad": "", # Clear scratchpad
-                "human_feedback": None # Clear any lingering feedback
-            }
-        except Exception as e:
-            logger.error(f"Error executing tool '{tool_name}': {e}", exc_info=True)
-            update = {
-                "last_tool_outputs": {"status": "error", "tool_name": tool_name, "message": f"Execution failed: {e}"},
-                "planned_tool_inputs": None,
-                "agent_scratchpad": "",
-                "human_feedback": None
-            }
-    else:
-        logger.error(f"Tool '{tool_name}' not found in TOOL_MAP.")
-        update = {
-            "last_tool_outputs": {"status": "error", "tool_name": tool_name, "message": "Tool definition not found."},
-            "planned_tool_inputs": None,
-            "agent_scratchpad": "",
-            "human_feedback": None
-        }
-
-    logger.info(f"--- Exiting Executor Node (No Review Required). Output: {update} ---")
-    return update
-
-# --- Agency Review Pause Node ---
-def agency_review_pause_node(state: AgentState) -> Dict[str, Any]:
-    """Placeholder node for the agency review interrupt point.
-    The graph pauses *before* AND *after* this node when run in dev mode.
-    To simulate review:
-    1. Click 'Continue' on the first pause (before).
-    2. Manually edit the 'human_feedback' field in the state JSON in the UI
-       (e.g., {"approved": false, "comment": "Needs VIN"}).
-    3. Click 'Continue' on the second pause (after).
-    """
-    logger.info("--- Entering Agency Review Pause Node ---")
-    logger.info("Graph paused BEFORE this node. Click 'Continue' to proceed to the 'after' pause.")
-    logger.info("If simulating review, manually edit 'human_feedback' state *before* the SECOND 'Continue'.")
-    # No state modification needed here by the node itself.
-    return {}
-
-# --- Conditional Edge Logic ---
-def check_agency_review(state: AgentState) -> str:
-    """
-    Conditional edge logic after the planner node.
-    Routes to review, execution, or end based on planner's decision.
-    """
-    logger.info("--- Checking Agency Review Requirement --- ")
-    requires_review = state.requires_agency_review
-    planned_action = state.planned_tool_inputs
-
-    if requires_review and planned_action:
-        logger.info("Routing to Agency Review Pause.")
-        return AGENCY_REVIEW_NODE_NAME # Route to the pause node
-    elif planned_action:
-        # Action planned, but no review needed
-        logger.info(f"Routing directly to Executor for tool: {planned_action.get('tool_name', 'unknown')}.")
-        return EXECUTOR_NO_REVIEW_NODE_NAME # Route to direct execution
-    else:
-        # No action planned (e.g., final answer or error)
-        logger.info("No tool planned or final answer. Routing to End.")
-        return END
-
-# --- Build Agent Graph ---
-def build_agent_graph() -> StateGraph:
-    """Builds the LangGraph StateGraph for the PPA Agent (V3 with Agency Review)."""
-    workflow = StateGraph(AgentState)
-
-    workflow.add_node(PLANNER_NODE_NAME, planner_node)
-    workflow.add_node(AGENCY_REVIEW_NODE_NAME, agency_review_pause_node)
-    workflow.add_node(EXECUTOR_NO_REVIEW_NODE_NAME, execute_tool_no_review) # Add the no-review executor
-
-    workflow.add_edge(START, PLANNER_NODE_NAME)
-
-    # Conditional edge from Planner based on review requirement
-    workflow.add_conditional_edges(
-        PLANNER_NODE_NAME,
-        check_agency_review,
-        {
-            AGENCY_REVIEW_NODE_NAME: AGENCY_REVIEW_NODE_NAME,
-            EXECUTOR_NO_REVIEW_NODE_NAME: EXECUTOR_NO_REVIEW_NODE_NAME, # Route to no-review executor
-            END: END
-        }
-    )
-
-    # Edge from Executor (No Review) back to Planner for next step
-    workflow.add_edge(EXECUTOR_NO_REVIEW_NODE_NAME, PLANNER_NODE_NAME)
-
-    # Edge *after* Agency Review Pause (human provides feedback) back to Planner
-    # The graph pauses *after* the agency_review_pause_node. When resumed,
-    # it proceeds to the planner, which will then process the human_feedback.
-    workflow.add_edge(AGENCY_REVIEW_NODE_NAME, PLANNER_NODE_NAME)
-
-    app = workflow.compile(
-        interrupt_before=[AGENCY_REVIEW_NODE_NAME],
-    )
-
-    logger.info("Agent graph V3 compiled with agency review interrupt (before).")
-    return app
-
-# --- Main Agent Class (Simple Runner for Now) ---
 class PPAAgentRunner:
-    """A helper class to manage running the agent graph for a thread."""
-    def __init__(self, graph: StateGraph):
-        self.graph = graph
+    """Manages the execution of the PPA Agentic V2 graph."""
 
-    def start_new_thread(self, initial_input: Dict[str, Any]) -> Dict[str, Any]:
-        """Starts a new conversation thread."""
-        logger.info("Starting new agent thread.")
-        config = {"configurable": {"thread_id": str(uuid.uuid4())}}
-        initial_state = self.graph.invoke(initial_input, config)
-        logger.info(f"New thread started. Initial state: {initial_state}")
-        return initial_state
+    def __init__(self):
+        logger.info("Initializing PPAAgentRunner...")
+        # Get the graph builder
+        self.app = build_agent_graph()
+        logger.info("Agent graph compiled.")
 
-    async def process_message(self, thread_id: str, message_content: str) -> List[Dict[str, Any]]:
-        """Processes a single user message in an existing thread."""
-        logger.info(f"Processing message for thread_id: {thread_id}")
-        config = {"configurable": {"thread_id": thread_id}}
-        input_data = {"messages": [HumanMessage(content=message_content)]}
+        # Define the checkpointer
+        memory = SqliteSaver.from_conn_string(SQLITE_DB_NAME)
 
-        output_chunks = []
-        async for chunk in self.graph.astream(input_data, config):
-            logger.info(f"Stream chunk: {chunk}")
-            output_chunks.append(chunk)
-            current_state = await self.graph.aget_state(config)
-            if current_state.next == (AGENCY_REVIEW_NODE_NAME,):
-                logger.info(f"Agent paused for Agency Review on thread {thread_id}.")
-                break
+        # Generate and store mermaid syntax *after* compilation
+        try:
+            # Use the compiled app to get the graph for drawing
+            self.graph_mermaid_syntax = self.app.get_graph().draw_mermaid()
+            logger.info("Generated Mermaid syntax for graph.")
+        except Exception as e:
+            logger.error(f"Failed to generate Mermaid syntax: {e}")
+            self.graph_mermaid_syntax = "Error: Could not generate graph diagram."
 
-        logger.info(f"Finished processing message stream for thread {thread_id}. Chunks: {len(output_chunks)}")
-        return output_chunks
+    async def _invoke_llm_and_parse(self, state: AgentState, update: Dict[str, Any]):
+        """(Instance Method) Invokes the LLM, parses the response, and updates the state update dict."""
+        if not llm_with_tools:
+            logger.error("LLM with tools is not initialized.")
+            update["agent_scratchpad"] = "Error: LLM not configured."
+            return
 
-    async def resume_from_review(self, thread_id: str, feedback: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Resumes a thread paused for agency review with feedback."""
+        # Format the prompt using the function from prompts.py
+        # Pass necessary components from state and the generated mermaid syntax
+        prompt_str = format_planner_prompt(
+            state=state,
+            tools=get_available_tools(),
+            current_tool_outputs=state.last_tool_outputs,
+            human_feedback_str=state.agent_scratchpad,
+            graph_mermaid_syntax=self.graph_mermaid_syntax # Use instance attribute
+        )
+        logger.debug(f"Formatted Planner Prompt:\n{prompt_str}")
+
+        # Prepare messages for LLM
+        messages = [HumanMessage(content=prompt_str)]
+
+        # --- Invoke LLM --- #
+        try:
+            logger.info("Invoking planner LLM...")
+            response = await llm_with_tools.ainvoke(messages)
+            logger.info("Planner LLM invocation successful.")
+
+            # --- Manually check for tool calls --- #
+            if response.tool_calls:
+                # Assumption: Planner LLM only calls one tool at a time
+                tool_call = response.tool_calls[0]
+                tool_name = tool_call['name']
+                try:
+                    # Args are now already a dict when using native tool calls
+                    tool_args = tool_call['args'] # Assign the dict directly
+                    logger.info(f"Planner decided to call tool: {tool_name} with args: {tool_args}")
+                    # Return the state update dictionary for tool execution
+                    update["planned_tool_inputs"] = {
+                        "tool_name": tool_name,
+                        "tool_args": tool_args
+                    }
+                    update["requires_agency_review"] = tool_call.get("requires_review", False)
+                    update["agent_scratchpad"] = tool_call.get("log", "Planning to use tool: " + tool_call.get("tool_name", "Unknown"))
+                    update["wait_signal"] = False
+                except Exception as e:
+                    logger.error(f"Failed to parse tool args: {e}")
+                    update["agent_scratchpad"] = f"Error: Planner failed to parse tool args for {tool_name}. Args: {tool_call['args']}"
+                    update["wait_signal"] = False
+            else:
+                # No tool call, LLM provided a response or decided to wait
+                logger.info("Planner decided on final answer/no tool.")
+                llm_content = response.content
+                update["agent_scratchpad"] = f"Planner response: {llm_content}"
+                # Check if the LLM explicitly stated it is waiting
+                if "wait" in llm_content.lower() or "waiting for customer" in llm_content.lower():
+                    logger.info("LLM response indicates waiting for customer.")
+                    update["wait_signal"] = True
+                else:
+                    update["wait_signal"] = False
+
+        except Exception as e:
+            logger.error(f"Unexpected error during planner LLM invocation/parsing: {e}", exc_info=True)
+            update["agent_scratchpad"] = f"Error: An unexpected error occurred in the planner LLM step. Error: {e}"
+            update["wait_signal"] = False
+
+    # --- Planner Node (Instance Method) --- #
+    async def planner_node(self, state: AgentState) -> Dict[str, Any]:
+        """(Instance Method) Determines the next action or tool call based on the current state via LLM call."""
+        logger.info("--- Planner Node --- ")
+        # Log input state details
+        logger.debug(f"Planner Node - Input last_tool_outputs: {state.last_tool_outputs}")
+        logger.debug(f"Planner Node - Input human_feedback: {state.human_feedback}")
+        logger.debug(f"Planner Node - Input agent_scratchpad: {state.agent_scratchpad}")
+
+        update: Dict[str, Any] = {}
+
+        # --- Prepare state before LLM call based on feedback --- #
+        if state.human_feedback:
+            logger.info(f"Planner received human feedback: {state.human_feedback}")
+            update["human_feedback"] = None # Always clear feedback after considering
+            if not state.human_feedback.get("approved"):
+                logger.info("Human denied previous plan. Clearing plan before replanning.")
+                update["planned_tool_inputs"] = None
+                update["last_tool_outputs"] = None
+            else:
+                logger.info("Human approved previous plan. LLM will confirm execution.")
+                update["last_tool_outputs"] = None
+        else:
+            update["last_tool_outputs"] = None
+
+        # --- Always Invoke LLM and Parse Output --- #
+        logger.info("Planner proceeding to call LLM.")
+        # Call the instance method _invoke_llm_and_parse
+        await self._invoke_llm_and_parse(state, update)
+
+        # Filter out None values before logging and returning
+        final_update = {k: v for k, v in update.items() if v is not None}
+        logger.info(f"Planner node final decision: {final_update}")
+        return final_update
+
+    # --- Executor Node (No Review Required) --- #
+    # (Keep execute_tool_no_review as a static/module-level function or make it a method if needed)
+    # ... (rest of PPAAgentRunner methods remain largely the same, using self.app) ...
+
+    # --- Public Invocation Methods --- #
+    async def stream(self, inputs: Dict[str, Any], config: Dict[str, Any]) -> AsyncIterator[Dict[str, Any]]:
+        """Streams the agent's execution steps."""
+        logger.info(f"Streaming agent with inputs: {inputs}, config: {config}")
+        async for output in self.app.stream(inputs, config=config):
+            yield output
+
+    async def ainvoke(self, inputs: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+        """Invokes the agent asynchronously for a single turn."""
+        logger.info(f"Invoking agent with inputs: {inputs}, config: {config}")
+        # Ensure interrupt configuration is included if needed, e.g., for review
+        final_config = config.copy()
+        final_config.setdefault("interrupt_before", ["agency_review_pause", "customer_wait_pause"])
+        
+        result = await self.app.ainvoke(inputs, config=final_config)
+        logger.info(f"Agent invocation completed. Result keys: {list(result.keys())}")
+        # logger.debug(f"Agent invocation result: {result}") # Might be too verbose
+        return result
+
+    def get_state(self, config: Dict[str, Any]) -> AgentState:
+        """Retrieves the current state of the agent graph for a given thread."""
+        logger.info(f"Getting agent state for config: {config}")
+        state = self.app.get_state(config=config)
+        # logger.debug(f"Retrieved state: {state}")
+        return state # type: ignore
+
+    def get_state_history(self, config: Dict[str, Any]) -> List[AgentState]:
+        """Retrieves the history of states for a given thread."""
+        logger.info(f"Getting agent state history for config: {config}")
+        history = []
+        for state in self.app.get_state_history(config=config):
+            history.append(state) # type: ignore
+        logger.info(f"Retrieved state history count: {len(history)}")
+        return history
+
+    async def update_state(self, config: Dict[str, Any], values: Dict[str, Any]) -> None:
+        """Updates the agent state for a given thread."""
+        # Note: 'values' should contain the fields to update, e.g., {'human_feedback': {...}}
+        logger.info(f"Updating agent state for config: {config} with values: {values}")
+        await self.app.update_state(config=config, values=values)
+        logger.info("Agent state updated.")
+
+    # --- Resume from Review Method --- # 
+    async def resume_from_review(self, thread_id: str, feedback: Dict[str, Any]) -> AsyncIterator[Dict[str, Any]]:
+        """Resumes the agent execution after human review with provided feedback."""
         logger.info(f"Resuming thread {thread_id} from review with feedback: {feedback}")
         config = {"configurable": {"thread_id": thread_id}}
-        
-        await self.graph.aupdate_state(config, {"human_feedback": feedback})
-        logger.info(f"State updated with human feedback for thread {thread_id}.")
 
-        output_chunks = []
-        async for chunk in self.graph.astream(None, config):
-            logger.info(f"Resumed stream chunk: {chunk}")
-            output_chunks.append(chunk)
-            current_state = await self.graph.aget_state(config)
-            if current_state.next == (AGENCY_REVIEW_NODE_NAME,):
-                logger.warning(f"Agent immediately paused again for review on thread {thread_id}. Check planner logic.")
-                break
+        # 1. Get the current state to format feedback message appropriately
+        current_state = self.get_state(config)
+        # Format feedback for scratchpad (ensure this logic matches planner expectations)
+        feedback_status = "approved" if feedback.get("approved", False) else "rejected"
+        feedback_comment = feedback.get("comment", "No comment provided.")
+        human_feedback_str = f"Human Review Feedback -> Status: {feedback_status}. Comment: {feedback_comment}"
 
-        logger.info(f"Finished resumed stream for thread {thread_id}. Chunks: {len(output_chunks)}")
-        return output_chunks
+        # Prepare update dictionary
+        update_values = {
+            "human_feedback": feedback,
+            "agent_scratchpad": human_feedback_str # Put formatted feedback here for LLM
+        }
 
-    async def get_thread_state(self, thread_id: str) -> AgentState:
-        """Retrieves the current state of a thread."""
-        logger.info(f"Getting state for thread_id: {thread_id}")
-        config = {"configurable": {"thread_id": thread_id}}
-        state = await self.graph.aget_state(config)
-        logger.info(f"Retrieved state for {thread_id}")
-        return state
+        # 2. Update the state with the feedback (and potentially clear scratchpad/tool plan if rejected?)
+        # The planner node now handles clearing state based on feedback approval status
+        await self.update_state(config, update_values)
+        logger.info(f"State updated for thread {thread_id} with review feedback.")
 
-# --- Main Execution (Example / Standalone Test) --- #
-graph = build_agent_graph()
+        # 3. Resume streaming from the point after the interruption
+        logger.info(f"Resuming stream for thread {thread_id}")
+        async for output in self.app.stream(None, config=config):
+             # The stream picks up from where it left off (after the interrupt)
+             logger.debug(f"Stream output after resume: Node='{next(iter(output))}', Keys='{list(output.values())[0].keys() if output else 'N/A'}'")
+             yield output
+        logger.info(f"Stream finished for thread {thread_id} after resume.")
+
+# --- Global Instance (Optional, depends on server setup) ---
+agent_runner = PPAAgentRunner() # Instantiate the runner
+graph = agent_runner.app # Expose the compiled graph for langgraph dev
+
+# --- Helper Functions (Keep execute_tool_no_review, etc. here or move into class) ---
+@tool
+def ask_customer_tool(missing_fields: List[str]) -> str:
+    """Asks the customer for the missing fields."""
+    # ... (rest of the function remains the same)
+
+async def execute_tool_no_review(state: AgentState) -> Dict[str, Any]:
+    """Executes the planned tool without prior review."""
+    # ... (rest of the function remains the same)
+
+async def agency_review_pause(state: AgentState) -> Dict[str, Any]:
+    """Node that pauses execution for agency review."""
+    # ... (rest of the function remains the same)
+
+async def customer_wait_pause(state: AgentState) -> Dict[str, Any]:
+    """Node that pauses execution to wait for customer input."""
+    # ... (rest of the function remains the same)
