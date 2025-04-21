@@ -853,7 +853,7 @@ This milestone confirms the agency review loop functions correctly.
 
         # Add nodes
         workflow.add_node("planner", planner_node)
-        workflow.add_node("executor", executor_node_wrapper)
+        workflow.add_node("executor", executor_node_wrapper) # Use the wrapper
         # Add placeholder nodes for interrupt targets if needed for explicit edge connection
         # These nodes don't do anything themselves, the pause happens *before* them
         workflow.add_node(AGENCY_REVIEW_NODE_NAME, lambda state: state)
@@ -1233,3 +1233,32 @@ You now have a functional agentic core. To make it production-ready:
     *   Set up monitoring and alerting.
 
 This detailed plan provides the code for Milestones 5 & 6 and outlines the significant effort required to move from this functional core to a production-ready system. Good luck!
+
+## Refined Agency Review (HITL) Workflow (Milestone 6)
+
+This milestone focused on improving the Human-in-the-Loop (HITL) process for agency review:
+
+1.  **Planner Node (`planner_node`) Logic Update:**
+    *   The planner now explicitly handles the `human_feedback` field in the `AgentState`.
+    *   **Approved Feedback:** If feedback is `{"approved": true, ...}`, the planner:
+        *   Retains the previously `planned_tool_inputs`.
+        *   Sets `requires_agency_review` to `False`.
+        *   Updates `last_tool_outputs` to indicate human approval.
+        *   **Skips calling the LLM** for replanning.
+        *   Routes directly to the `executor_node_wrapper` via the conditional edge logic.
+    *   **Rejected Feedback:** If feedback is `{"approved": false, ...}`, the planner:
+        *   Clears the `planned_tool_inputs`.
+        *   Updates `last_tool_outputs` to indicate human rejection.
+        *   Includes the rejection comment in the scratchpad/prompt history.
+        *   **Calls the LLM** to generate a new plan based on the rejection feedback.
+
+2.  **Executor Node (`executor_node_wrapper`) Update:**
+    *   The executor is now responsible for looking up the correct tool function based on the `tool_name` provided in `planned_tool_inputs`.
+    *   It uses the `TOOL_MAP` imported from `src.ppa_agentic_v2.tools`.
+    *   It invokes the tool asynchronously using `selected_tool.ainvoke(input_args)`.
+    *   Error handling for missing tools or execution failures has been added.
+
+3.  **Prompt Formatting (`format_planner_prompt`) Update:**
+    *   The function signature was updated to accept `current_tool_outputs` and `human_feedback_str` directly, making it more modular.
+
+**Outcome:** This refined flow allows an approved action to proceed directly to execution without requiring a redundant LLM call or a second agency review pause. Rejections trigger a replanning step, incorporating the feedback provided by the human reviewer.
