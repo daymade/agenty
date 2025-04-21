@@ -1,34 +1,19 @@
-# src/ppa_agentic_v2/agent.py
+# src/ppa_agentic_v2/nodes.py
+
 import logging
 import json
+import re
 from typing import List, Dict, Any, Optional, Tuple
-from langgraph.graph import StateGraph, END, START
-from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, BaseMessage, SystemMessage
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder 
-from pydantic import ValidationError, BaseModel, Field 
-from langgraph.prebuilt import ToolNode 
-from langgraph.checkpoint.sqlite import SqliteSaver
-import sqlite3 
-from langchain_core.utils.function_calling import convert_to_openai_tool 
-from .state import AgentState
-from .tools import all_tools, TOOL_MAP 
-from .config import ( 
-    SQLITE_DB_NAME, GOOGLE_API_KEY, OPENAI_API_KEY, 
-    DEFAULT_LLM_PROVIDER, GOOGLE_MODEL_NAME, OPENAI_MODEL_NAME, logger
-)
-from .prompts import format_planner_prompt 
-from .llm import get_llm_client 
-from langchain_core.messages import AIMessage 
-import uuid 
-import re 
-from langchain_core.exceptions import OutputParserException 
-from pydantic import ValidationError 
-from .llm_setup import llm, llm_with_tools # Import initialized LLMs
 
-# --- Constants ---
-PLANNER_NODE_NAME = "planner"
-EXECUTOR_NO_REVIEW_NODE_NAME = "execute_tool_no_review"
-AGENCY_REVIEW_NODE_NAME = "agency_review_pause"
+from langchain_core.messages import BaseMessage
+from pydantic import ValidationError
+from langchain_core.exceptions import OutputParserException
+
+from .state import AgentState
+from .tools import all_tools, TOOL_MAP
+from .config import logger
+from .prompts import format_planner_prompt
+from .llm_setup import llm_with_tools
 
 # --- Planner Node Helper Functions ---
 
@@ -73,7 +58,6 @@ def _handle_human_feedback(state: AgentState, update: Dict[str, Any]) -> Tuple[b
         logger.debug("No human feedback found.")
 
     return call_llm, prompt_input_messages, current_tool_outputs
-
 
 async def _invoke_llm_and_parse(state: AgentState, prompt_input_messages: Optional[List[BaseMessage]], current_tool_outputs: Optional[Dict[str, Any]], update: Dict[str, Any]):
     """Invokes the LLM, parses the response, and updates the state update dict."""
@@ -152,7 +136,9 @@ async def _invoke_llm_and_parse(state: AgentState, prompt_input_messages: Option
         update["requires_agency_review"] = True # Force review on unexpected errors
         update["planned_tool_inputs"] = None
 
-# --- Planner Node --- #
+
+# --- Graph Nodes ---
+
 async def planner_node(state: AgentState) -> Dict[str, Any]:
     logger.info("--- Entering Planner Node ---")
     update: Dict[str, Any] = {
@@ -175,7 +161,6 @@ async def planner_node(state: AgentState) -> Dict[str, Any]:
     logger.info(f"--- Exiting Planner Node. State updates: {final_update} ---")
     return final_update
 
-# --- Executor Node (No Review Required) ---
 async def execute_tool_no_review(state: AgentState) -> Dict[str, Any]:
     """Executes the tool specified in state.planned_tool_inputs.
     This node is ONLY called when the planner decides to execute a tool
@@ -197,6 +182,7 @@ async def execute_tool_no_review(state: AgentState) -> Dict[str, Any]:
 
     logger.info(f"Executing tool (no review required): {tool_name} with args: {tool_args}")
 
+    tool_output = None
     if tool_name in TOOL_MAP:
         selected_tool = TOOL_MAP[tool_name]
         try:
@@ -204,34 +190,25 @@ async def execute_tool_no_review(state: AgentState) -> Dict[str, Any]:
             # If tool_args is None or not a dict, provide an empty dict
             input_args = tool_args if isinstance(tool_args, dict) else {}
             tool_result = await selected_tool.ainvoke(input_args)
-            logger.info(f"Tool '{tool_name}' executed successfully (no review). Result keys: {list(tool_result.keys()) if isinstance(tool_result, dict) else 'N/A'}")
-            update = {
-                "last_tool_outputs": tool_result,
-                "planned_tool_inputs": None, # Clear plan after execution
-                "agent_scratchpad": "", # Clear scratchpad
-                "human_feedback": None # Clear any lingering feedback
-            }
+
+            # Assuming tool_result is serializable (string, dict, list, etc.)
+            tool_output = {"status": "success", "tool_name": tool_name, "result": tool_result}
+            logger.info(f"Tool {tool_name} executed successfully. Result: {tool_result}")
+
+        except ValidationError as ve:
+            logger.error(f"Validation error executing tool {tool_name} with args {tool_args}: {ve}", exc_info=True)
+            tool_output = {"status": "error", "tool_name": tool_name, "message": f"Input validation failed for {tool_name}: {str(ve)}"}
         except Exception as e:
-            logger.error(f"Error executing tool '{tool_name}': {e}", exc_info=True)
-            update = {
-                "last_tool_outputs": {"status": "error", "tool_name": tool_name, "message": f"Execution failed: {e}"},
-                "planned_tool_inputs": None,
-                "agent_scratchpad": "",
-                "human_feedback": None
-            }
+            logger.error(f"Error executing tool {tool_name}: {e}", exc_info=True)
+            tool_output = {"status": "error", "tool_name": tool_name, "message": f"Error executing tool {tool_name}: {str(e)}"}
     else:
         logger.error(f"Tool '{tool_name}' not found in TOOL_MAP.")
-        update = {
-            "last_tool_outputs": {"status": "error", "tool_name": tool_name, "message": "Tool definition not found."},
-            "planned_tool_inputs": None,
-            "agent_scratchpad": "",
-            "human_feedback": None
-        }
+        tool_output = {"status": "error", "tool_name": tool_name, "message": f"Tool '{tool_name}' is not implemented or mapped."}
 
-    logger.info(f"--- Exiting Executor Node (No Review Required). Output: {update} ---")
-    return update
+    logger.info(f"--- Exiting Executor Node (No Review Required). Output: {tool_output} ---")
+    # Return only the tool output to be stored in 'last_tool_outputs'
+    return {"last_tool_outputs": tool_output}
 
-# --- Agency Review Pause Node ---
 def agency_review_pause_node(state: AgentState) -> Dict[str, Any]:
     """Placeholder node for the agency review interrupt point.
     The graph pauses *before* AND *after* this node when run in dev mode.
@@ -241,130 +218,6 @@ def agency_review_pause_node(state: AgentState) -> Dict[str, Any]:
        (e.g., {"approved": false, "comment": "Needs VIN"}).
     3. Click 'Continue' on the second pause (after).
     """
-    logger.info("--- Entering Agency Review Pause Node ---")
-    logger.info("Graph paused BEFORE this node. Click 'Continue' to proceed to the 'after' pause.")
-    logger.info("If simulating review, manually edit 'human_feedback' state *before* the SECOND 'Continue'.")
+    logger.info("--- Pausing for Agency Review --- ")
     # No state modification needed here by the node itself.
     return {}
-
-# --- Conditional Edge Logic ---
-def check_agency_review(state: AgentState) -> str:
-    """
-    Conditional edge logic after the planner node.
-    Routes to review, execution, or end based on planner's decision.
-    """
-    logger.info("--- Checking Agency Review Requirement --- ")
-    requires_review = state.requires_agency_review
-    planned_action = state.planned_tool_inputs
-
-    if requires_review and planned_action:
-        logger.info("Routing to Agency Review Pause.")
-        return AGENCY_REVIEW_NODE_NAME # Route to the pause node
-    elif planned_action:
-        # Action planned, but no review needed
-        logger.info(f"Routing directly to Executor for tool: {planned_action.get('tool_name', 'unknown')}.")
-        return EXECUTOR_NO_REVIEW_NODE_NAME # Route to direct execution
-    else:
-        # No action planned (e.g., final answer or error)
-        logger.info("No tool planned or final answer. Routing to End.")
-        return END
-
-# --- Build Agent Graph ---
-def build_agent_graph() -> StateGraph:
-    """Builds the LangGraph StateGraph for the PPA Agent (V3 with Agency Review)."""
-    workflow = StateGraph(AgentState)
-
-    workflow.add_node(PLANNER_NODE_NAME, planner_node)
-    workflow.add_node(AGENCY_REVIEW_NODE_NAME, agency_review_pause_node)
-    workflow.add_node(EXECUTOR_NO_REVIEW_NODE_NAME, execute_tool_no_review) # Add the no-review executor
-
-    workflow.add_edge(START, PLANNER_NODE_NAME)
-
-    # Conditional edge from Planner based on review requirement
-    workflow.add_conditional_edges(
-        PLANNER_NODE_NAME,
-        check_agency_review,
-        {
-            AGENCY_REVIEW_NODE_NAME: AGENCY_REVIEW_NODE_NAME,
-            EXECUTOR_NO_REVIEW_NODE_NAME: EXECUTOR_NO_REVIEW_NODE_NAME, # Route to no-review executor
-            END: END
-        }
-    )
-
-    # Edge from Executor (No Review) back to Planner for next step
-    workflow.add_edge(EXECUTOR_NO_REVIEW_NODE_NAME, PLANNER_NODE_NAME)
-
-    # Edge *after* Agency Review Pause (human provides feedback) back to Planner
-    # The graph pauses *after* the agency_review_pause_node. When resumed,
-    # it proceeds to the planner, which will then process the human_feedback.
-    workflow.add_edge(AGENCY_REVIEW_NODE_NAME, PLANNER_NODE_NAME)
-
-    app = workflow.compile(
-        interrupt_before=[AGENCY_REVIEW_NODE_NAME],
-    )
-
-    logger.info("Agent graph V3 compiled with agency review interrupt (before).")
-    return app
-
-# --- Main Agent Class (Simple Runner for Now) ---
-class PPAAgentRunner:
-    """A helper class to manage running the agent graph for a thread."""
-    def __init__(self, graph: StateGraph):
-        self.graph = graph
-
-    def start_new_thread(self, initial_input: Dict[str, Any]) -> Dict[str, Any]:
-        """Starts a new conversation thread."""
-        logger.info("Starting new agent thread.")
-        config = {"configurable": {"thread_id": str(uuid.uuid4())}}
-        initial_state = self.graph.invoke(initial_input, config)
-        logger.info(f"New thread started. Initial state: {initial_state}")
-        return initial_state
-
-    async def process_message(self, thread_id: str, message_content: str) -> List[Dict[str, Any]]:
-        """Processes a single user message in an existing thread."""
-        logger.info(f"Processing message for thread_id: {thread_id}")
-        config = {"configurable": {"thread_id": thread_id}}
-        input_data = {"messages": [HumanMessage(content=message_content)]}
-
-        output_chunks = []
-        async for chunk in self.graph.astream(input_data, config):
-            logger.info(f"Stream chunk: {chunk}")
-            output_chunks.append(chunk)
-            current_state = await self.graph.aget_state(config)
-            if current_state.next == (AGENCY_REVIEW_NODE_NAME,):
-                logger.info(f"Agent paused for Agency Review on thread {thread_id}.")
-                break
-
-        logger.info(f"Finished processing message stream for thread {thread_id}. Chunks: {len(output_chunks)}")
-        return output_chunks
-
-    async def resume_from_review(self, thread_id: str, feedback: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Resumes a thread paused for agency review with feedback."""
-        logger.info(f"Resuming thread {thread_id} from review with feedback: {feedback}")
-        config = {"configurable": {"thread_id": thread_id}}
-        
-        await self.graph.aupdate_state(config, {"human_feedback": feedback})
-        logger.info(f"State updated with human feedback for thread {thread_id}.")
-
-        output_chunks = []
-        async for chunk in self.graph.astream(None, config):
-            logger.info(f"Resumed stream chunk: {chunk}")
-            output_chunks.append(chunk)
-            current_state = await self.graph.aget_state(config)
-            if current_state.next == (AGENCY_REVIEW_NODE_NAME,):
-                logger.warning(f"Agent immediately paused again for review on thread {thread_id}. Check planner logic.")
-                break
-
-        logger.info(f"Finished resumed stream for thread {thread_id}. Chunks: {len(output_chunks)}")
-        return output_chunks
-
-    async def get_thread_state(self, thread_id: str) -> AgentState:
-        """Retrieves the current state of a thread."""
-        logger.info(f"Getting state for thread_id: {thread_id}")
-        config = {"configurable": {"thread_id": thread_id}}
-        state = await self.graph.aget_state(config)
-        logger.info(f"Retrieved state for {thread_id}")
-        return state
-
-# --- Main Execution (Example / Standalone Test) --- #
-graph = build_agent_graph()
