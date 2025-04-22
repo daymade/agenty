@@ -1,0 +1,775 @@
+[
+  {
+    "values": {
+      "messages": [
+        {
+          "content": "hi i need a quote",
+          "type": "human"
+        }
+      ],
+      "agent_scratchpad": "I have already asked the customer for the necessary information to initiate a quote, including driver name, DOB, and address details. The last action was successful, and now I need to wait for the customer's response with the required information.",
+      "planned_tool_inputs": null,
+      "action_pending_review": null,
+      "requires_agency_review": false,
+      "human_feedback": null,
+      "event_history": [
+        {
+          "type": "human_feedback",
+          "status": "approved_by_human",
+          "tool_name": "ask_customer_tool",
+          "message": "Approved to ask customer"
+        },
+        {
+          "type": "tool_execution",
+          "status": "success",
+          "tool_name": "ask_customer_tool",
+          "result": {
+            "status": "success",
+            "message_content": "To help me provide an accurate quote, could you please share the following: driver_name, driver_dob, address_line1, city, state_code, zip_code?",
+            "message_type": "info_request"
+          }
+        }
+      ],
+      "last_tool_outputs": null
+    },
+    "next": [
+      "customer_wait"
+    ],
+    "tasks": [
+      {
+        "id": "55259bba-bd86-5d9e-b18f-46a97bc2ea5d",
+        "name": "customer_wait",
+        "path": [
+          "__pregel_pull",
+          "customer_wait"
+        ],
+        "error": null,
+        "interrupts": [],
+        "checkpoint": null,
+        "state": null,
+        "result": null
+      }
+    ],
+    "metadata": {
+      "x-auth-scheme": "langsmith",
+      "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
+      "langgraph_auth_user": null,
+      "langgraph_auth_user_id": "",
+      "langgraph_auth_permissions": [],
+      "graph_id": "ppa_agent_v2",
+      "assistant_id": "e73b8820-3ec2-5b81-94e3-14f0eaa2b133",
+      "user_id": "",
+      "created_by": "system",
+      "from_studio": true,
+      "LANGGRAPH_API_URL": "http://127.0.0.1:2024",
+      "run_attempt": 1,
+      "langgraph_version": "0.3.31",
+      "langgraph_plan": "developer",
+      "langgraph_host": "self-hosted",
+      "langgraph_api_url": "http://127.0.0.1:2024",
+      "thread_id": "4afbc61f-2a14-4c3e-bba4-6d0ee69c07aa",
+      "checkpoint_id": "1f01f5c6-446f-69d1-8002-8367675cc880",
+      "run_id": "1f01f5c6-44aa-6082-b580-214307e79ea9",
+      "source": "loop",
+      "writes": {
+        "planner": {
+          "agent_scratchpad": "I have already asked the customer for the necessary information to initiate a quote, including driver name, DOB, and address details. The last action was successful, and now I need to wait for the customer's response with the required information.",
+          "requires_agency_review": false,
+          "planned_tool_inputs": null,
+          "human_feedback": null,
+          "last_tool_outputs": null,
+          "action_pending_review": null
+        }
+      },
+      "step": 5,
+      "parents": {}
+    },
+    "created_at": "2025-04-22T09:30:17.260650+00:00",
+    "checkpoint": {
+      "checkpoint_id": "1f01f5c6-6eae-6184-8005-0628ccd50622",
+      "thread_id": "4afbc61f-2a14-4c3e-bba4-6d0ee69c07aa",
+      "checkpoint_ns": ""
+    },
+    "parent_checkpoint": {
+      "checkpoint_id": "1f01f5c6-5353-61ef-8004-72beb838cfc9",
+      "thread_id": "4afbc61f-2a14-4c3e-bba4-6d0ee69c07aa",
+      "checkpoint_ns": ""
+    },
+    "checkpoint_id": "1f01f5c6-6eae-6184-8005-0628ccd50622",
+    "parent_checkpoint_id": "1f01f5c6-5353-61ef-8004-72beb838cfc9"
+  },
+  {
+    "values": {
+      "messages": [
+        {
+          "content": "hi i need a quote",
+          "type": "human"
+        }
+      ],
+      "agent_scratchpad": "Processed human feedback: N/A. Comment: Approved to ask customer",
+      "planned_tool_inputs": null,
+      "action_pending_review": null,
+      "requires_agency_review": false,
+      "human_feedback": null,
+      "event_history": [
+        {
+          "type": "human_feedback",
+          "status": "approved_by_human",
+          "tool_name": "ask_customer_tool",
+          "message": "Approved to ask customer"
+        },
+        {
+          "type": "tool_execution",
+          "status": "success",
+          "tool_name": "ask_customer_tool",
+          "result": {
+            "status": "success",
+            "message_content": "To help me provide an accurate quote, could you please share the following: driver_name, driver_dob, address_line1, city, state_code, zip_code?",
+            "message_type": "info_request"
+          }
+        }
+      ],
+      "last_tool_outputs": {
+        "status": "success",
+        "tool_name": "ask_customer_tool",
+        "result": {
+          "status": "success",
+          "message_content": "To help me provide an accurate quote, could you please share the following: driver_name, driver_dob, address_line1, city, state_code, zip_code?",
+          "message_type": "info_request"
+        }
+      }
+    },
+    "next": [
+      "planner"
+    ],
+    "tasks": [
+      {
+        "id": "6a90ed7f-84c0-fc9f-2523-7ae800aa904d",
+        "name": "planner",
+        "path": [
+          "__pregel_pull",
+          "planner"
+        ],
+        "error": null,
+        "interrupts": [],
+        "checkpoint": null,
+        "state": null,
+        "result": {
+          "agent_scratchpad": "I have already asked the customer for the necessary information to initiate a quote, including driver name, DOB, and address details. The last action was successful, and now I need to wait for the customer's response with the required information.",
+          "requires_agency_review": false,
+          "planned_tool_inputs": null,
+          "human_feedback": null,
+          "last_tool_outputs": null,
+          "action_pending_review": null
+        }
+      }
+    ],
+    "metadata": {
+      "x-auth-scheme": "langsmith",
+      "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
+      "langgraph_auth_user": null,
+      "langgraph_auth_user_id": "",
+      "langgraph_auth_permissions": [],
+      "graph_id": "ppa_agent_v2",
+      "assistant_id": "e73b8820-3ec2-5b81-94e3-14f0eaa2b133",
+      "user_id": "",
+      "created_by": "system",
+      "from_studio": true,
+      "LANGGRAPH_API_URL": "http://127.0.0.1:2024",
+      "run_attempt": 1,
+      "langgraph_version": "0.3.31",
+      "langgraph_plan": "developer",
+      "langgraph_host": "self-hosted",
+      "langgraph_api_url": "http://127.0.0.1:2024",
+      "thread_id": "4afbc61f-2a14-4c3e-bba4-6d0ee69c07aa",
+      "checkpoint_id": "1f01f5c6-446f-69d1-8002-8367675cc880",
+      "run_id": "1f01f5c6-44aa-6082-b580-214307e79ea9",
+      "source": "loop",
+      "writes": {
+        "execute_tool_no_review": {
+          "last_tool_outputs": {
+            "status": "success",
+            "tool_name": "ask_customer_tool",
+            "result": {
+              "status": "success",
+              "message_content": "To help me provide an accurate quote, could you please share the following: driver_name, driver_dob, address_line1, city, state_code, zip_code?",
+              "message_type": "info_request"
+            }
+          },
+          "event_history": [
+            {
+              "type": "tool_execution",
+              "status": "success",
+              "tool_name": "ask_customer_tool",
+              "result": {
+                "status": "success",
+                "message_content": "To help me provide an accurate quote, could you please share the following: driver_name, driver_dob, address_line1, city, state_code, zip_code?",
+                "message_type": "info_request"
+              }
+            }
+          ],
+          "planned_tool_inputs": null,
+          "action_pending_review": null
+        }
+      },
+      "step": 4,
+      "parents": {}
+    },
+    "created_at": "2025-04-22T09:30:14.392251+00:00",
+    "checkpoint": {
+      "checkpoint_id": "1f01f5c6-5353-61ef-8004-72beb838cfc9",
+      "thread_id": "4afbc61f-2a14-4c3e-bba4-6d0ee69c07aa",
+      "checkpoint_ns": ""
+    },
+    "parent_checkpoint": {
+      "checkpoint_id": "1f01f5c6-4e6c-6948-8003-190261888359",
+      "thread_id": "4afbc61f-2a14-4c3e-bba4-6d0ee69c07aa",
+      "checkpoint_ns": ""
+    },
+    "checkpoint_id": "1f01f5c6-5353-61ef-8004-72beb838cfc9",
+    "parent_checkpoint_id": "1f01f5c6-4e6c-6948-8003-190261888359"
+  },
+  {
+    "values": {
+      "messages": [
+        {
+          "content": "hi i need a quote",
+          "type": "human"
+        }
+      ],
+      "agent_scratchpad": "Processed human feedback: N/A. Comment: Approved to ask customer",
+      "planned_tool_inputs": {
+        "tool_name": "ask_customer_tool",
+        "args": {
+          "missing_fields": [
+            "driver_name",
+            "driver_dob",
+            "address_line1",
+            "city",
+            "state_code",
+            "zip_code"
+          ]
+        }
+      },
+      "action_pending_review": null,
+      "requires_agency_review": false,
+      "human_feedback": null,
+      "event_history": [
+        {
+          "type": "human_feedback",
+          "status": "approved_by_human",
+          "tool_name": "ask_customer_tool",
+          "message": "Approved to ask customer"
+        }
+      ],
+      "last_tool_outputs": {
+        "status": "approved_by_human",
+        "tool_name": "ask_customer_tool",
+        "message": "Approved to ask customer"
+      }
+    },
+    "next": [
+      "execute_tool_no_review"
+    ],
+    "tasks": [
+      {
+        "id": "5ace4f78-1bce-133d-9faf-4f8e89f0f4b1",
+        "name": "execute_tool_no_review",
+        "path": [
+          "__pregel_pull",
+          "execute_tool_no_review"
+        ],
+        "error": null,
+        "interrupts": [],
+        "checkpoint": null,
+        "state": null,
+        "result": {
+          "last_tool_outputs": {
+            "status": "success",
+            "tool_name": "ask_customer_tool",
+            "result": {
+              "status": "success",
+              "message_content": "To help me provide an accurate quote, could you please share the following: driver_name, driver_dob, address_line1, city, state_code, zip_code?",
+              "message_type": "info_request"
+            }
+          },
+          "event_history": [
+            {
+              "type": "tool_execution",
+              "status": "success",
+              "tool_name": "ask_customer_tool",
+              "result": {
+                "status": "success",
+                "message_content": "To help me provide an accurate quote, could you please share the following: driver_name, driver_dob, address_line1, city, state_code, zip_code?",
+                "message_type": "info_request"
+              }
+            }
+          ],
+          "planned_tool_inputs": null,
+          "action_pending_review": null
+        }
+      }
+    ],
+    "metadata": {
+      "x-auth-scheme": "langsmith",
+      "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
+      "langgraph_auth_user": null,
+      "langgraph_auth_user_id": "",
+      "langgraph_auth_permissions": [],
+      "graph_id": "ppa_agent_v2",
+      "assistant_id": "e73b8820-3ec2-5b81-94e3-14f0eaa2b133",
+      "user_id": "",
+      "created_by": "system",
+      "from_studio": true,
+      "LANGGRAPH_API_URL": "http://127.0.0.1:2024",
+      "run_attempt": 1,
+      "langgraph_version": "0.3.31",
+      "langgraph_plan": "developer",
+      "langgraph_host": "self-hosted",
+      "langgraph_api_url": "http://127.0.0.1:2024",
+      "thread_id": "4afbc61f-2a14-4c3e-bba4-6d0ee69c07aa",
+      "checkpoint_id": "1f01f5c6-446f-69d1-8002-8367675cc880",
+      "run_id": "1f01f5c6-44aa-6082-b580-214307e79ea9",
+      "source": "loop",
+      "writes": {
+        "planner": {
+          "agent_scratchpad": "Processed human feedback: N/A. Comment: Approved to ask customer",
+          "requires_agency_review": false,
+          "planned_tool_inputs": {
+            "tool_name": "ask_customer_tool",
+            "args": {
+              "missing_fields": [
+                "driver_name",
+                "driver_dob",
+                "address_line1",
+                "city",
+                "state_code",
+                "zip_code"
+              ]
+            }
+          },
+          "human_feedback": null,
+          "last_tool_outputs": {
+            "status": "approved_by_human",
+            "tool_name": "ask_customer_tool",
+            "message": "Approved to ask customer"
+          },
+          "event_history": [
+            {
+              "type": "human_feedback",
+              "status": "approved_by_human",
+              "tool_name": "ask_customer_tool",
+              "message": "Approved to ask customer"
+            }
+          ],
+          "action_pending_review": null
+        }
+      },
+      "step": 3,
+      "parents": {}
+    },
+    "created_at": "2025-04-22T09:30:13.878384+00:00",
+    "checkpoint": {
+      "checkpoint_id": "1f01f5c6-4e6c-6948-8003-190261888359",
+      "thread_id": "4afbc61f-2a14-4c3e-bba4-6d0ee69c07aa",
+      "checkpoint_ns": ""
+    },
+    "parent_checkpoint": {
+      "checkpoint_id": "1f01f5c6-446f-69d1-8002-8367675cc880",
+      "thread_id": "4afbc61f-2a14-4c3e-bba4-6d0ee69c07aa",
+      "checkpoint_ns": ""
+    },
+    "checkpoint_id": "1f01f5c6-4e6c-6948-8003-190261888359",
+    "parent_checkpoint_id": "1f01f5c6-446f-69d1-8002-8367675cc880"
+  },
+  {
+    "values": {
+      "messages": [
+        {
+          "content": "hi i need a quote",
+          "type": "human"
+        }
+      ],
+      "agent_scratchpad": "The customer has requested a quote, but I don't have any of the necessary information to initiate the quote process. I need to gather the primary driver's full name, date of birth, and complete address details. I will use the ask_customer_tool to request this information from the customer.",
+      "planned_tool_inputs": null,
+      "action_pending_review": {
+        "tool_name": "ask_customer_tool",
+        "args": {
+          "missing_fields": [
+            "driver_name",
+            "driver_dob",
+            "address_line1",
+            "city",
+            "state_code",
+            "zip_code"
+          ]
+        }
+      },
+      "requires_agency_review": true,
+      "human_feedback": {
+        "approved": true,
+        "comment": "Approved to ask customer"
+      },
+      "event_history": [],
+      "last_tool_outputs": null
+    },
+    "next": [
+      "planner"
+    ],
+    "tasks": [
+      {
+        "id": "3b9fcb84-7fac-f9c4-0d12-793f6fe00dfa",
+        "name": "planner",
+        "path": [
+          "__pregel_pull",
+          "planner"
+        ],
+        "error": null,
+        "interrupts": [],
+        "checkpoint": null,
+        "state": null,
+        "result": {
+          "agent_scratchpad": "Processed human feedback: N/A. Comment: Approved to ask customer",
+          "requires_agency_review": false,
+          "planned_tool_inputs": {
+            "tool_name": "ask_customer_tool",
+            "args": {
+              "missing_fields": [
+                "driver_name",
+                "driver_dob",
+                "address_line1",
+                "city",
+                "state_code",
+                "zip_code"
+              ]
+            }
+          },
+          "human_feedback": null,
+          "last_tool_outputs": {
+            "status": "approved_by_human",
+            "tool_name": "ask_customer_tool",
+            "message": "Approved to ask customer"
+          },
+          "event_history": [
+            {
+              "type": "human_feedback",
+              "status": "approved_by_human",
+              "tool_name": "ask_customer_tool",
+              "message": "Approved to ask customer"
+            }
+          ],
+          "action_pending_review": null
+        }
+      }
+    ],
+    "metadata": {
+      "graph_id": "ppa_agent_v2",
+      "thread_id": "4afbc61f-2a14-4c3e-bba4-6d0ee69c07aa",
+      "checkpoint_id": "1f01f5c5-b464-64e8-8001-ce7c444357a4",
+      "checkpoint_ns": "",
+      "x-auth-scheme": "langsmith",
+      "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
+      "langgraph_auth_user": null,
+      "langgraph_auth_user_id": "",
+      "langgraph_auth_permissions": [],
+      "assistant_id": "e73b8820-3ec2-5b81-94e3-14f0eaa2b133",
+      "user_id": "",
+      "created_by": "system",
+      "from_studio": true,
+      "LANGGRAPH_API_URL": "http://127.0.0.1:2024",
+      "run_attempt": 1,
+      "langgraph_version": "0.3.31",
+      "langgraph_plan": "developer",
+      "langgraph_host": "self-hosted",
+      "langgraph_api_url": "http://127.0.0.1:2024",
+      "run_id": "1f01f5c5-8bb2-6740-ae1c-31acaa9c1c27",
+      "source": "update",
+      "writes": {
+        "agency_review_pause": {
+          "human_feedback": {
+            "approved": true,
+            "comment": "Approved to ask customer"
+          }
+        }
+      },
+      "step": 2,
+      "parents": {}
+    },
+    "created_at": "2025-04-22T09:30:12.830923+00:00",
+    "checkpoint": {
+      "checkpoint_id": "1f01f5c6-446f-69d1-8002-8367675cc880",
+      "thread_id": "4afbc61f-2a14-4c3e-bba4-6d0ee69c07aa",
+      "checkpoint_ns": ""
+    },
+    "parent_checkpoint": {
+      "checkpoint_id": "1f01f5c5-b464-64e8-8001-ce7c444357a4",
+      "thread_id": "4afbc61f-2a14-4c3e-bba4-6d0ee69c07aa",
+      "checkpoint_ns": ""
+    },
+    "checkpoint_id": "1f01f5c6-446f-69d1-8002-8367675cc880",
+    "parent_checkpoint_id": "1f01f5c5-b464-64e8-8001-ce7c444357a4"
+  },
+  {
+    "values": {
+      "messages": [
+        {
+          "content": "hi i need a quote",
+          "type": "human"
+        }
+      ],
+      "agent_scratchpad": "The customer has requested a quote, but I don't have any of the necessary information to initiate the quote process. I need to gather the primary driver's full name, date of birth, and complete address details. I will use the ask_customer_tool to request this information from the customer.",
+      "planned_tool_inputs": null,
+      "action_pending_review": {
+        "tool_name": "ask_customer_tool",
+        "args": {
+          "missing_fields": [
+            "driver_name",
+            "driver_dob",
+            "address_line1",
+            "city",
+            "state_code",
+            "zip_code"
+          ]
+        }
+      },
+      "requires_agency_review": true,
+      "human_feedback": null,
+      "event_history": [],
+      "last_tool_outputs": null
+    },
+    "next": [
+      "agency_review_pause"
+    ],
+    "tasks": [
+      {
+        "id": "d5b15b5b-f9ea-24a6-7af3-198b63df5c3a",
+        "name": "agency_review_pause",
+        "path": [
+          "__pregel_pull",
+          "agency_review_pause"
+        ],
+        "error": null,
+        "interrupts": [],
+        "checkpoint": null,
+        "state": null,
+        "result": null
+      }
+    ],
+    "metadata": {
+      "x-auth-scheme": "langsmith",
+      "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
+      "langgraph_auth_user": null,
+      "langgraph_auth_user_id": "",
+      "langgraph_auth_permissions": [],
+      "graph_id": "ppa_agent_v2",
+      "assistant_id": "e73b8820-3ec2-5b81-94e3-14f0eaa2b133",
+      "user_id": "",
+      "created_by": "system",
+      "from_studio": true,
+      "LANGGRAPH_API_URL": "http://127.0.0.1:2024",
+      "run_attempt": 1,
+      "langgraph_version": "0.3.31",
+      "langgraph_plan": "developer",
+      "langgraph_host": "self-hosted",
+      "langgraph_api_url": "http://127.0.0.1:2024",
+      "thread_id": "4afbc61f-2a14-4c3e-bba4-6d0ee69c07aa",
+      "run_id": "1f01f5c5-8bb2-6740-ae1c-31acaa9c1c27",
+      "source": "loop",
+      "writes": {
+        "planner": {
+          "agent_scratchpad": "The customer has requested a quote, but I don't have any of the necessary information to initiate the quote process. I need to gather the primary driver's full name, date of birth, and complete address details. I will use the ask_customer_tool to request this information from the customer.",
+          "requires_agency_review": true,
+          "planned_tool_inputs": null,
+          "human_feedback": null,
+          "last_tool_outputs": null,
+          "action_pending_review": {
+            "tool_name": "ask_customer_tool",
+            "args": {
+              "missing_fields": [
+                "driver_name",
+                "driver_dob",
+                "address_line1",
+                "city",
+                "state_code",
+                "zip_code"
+              ]
+            }
+          }
+        }
+      },
+      "step": 1,
+      "parents": {}
+    },
+    "created_at": "2025-04-22T09:29:57.726921+00:00",
+    "checkpoint": {
+      "checkpoint_id": "1f01f5c5-b464-64e8-8001-ce7c444357a4",
+      "thread_id": "4afbc61f-2a14-4c3e-bba4-6d0ee69c07aa",
+      "checkpoint_ns": ""
+    },
+    "parent_checkpoint": {
+      "checkpoint_id": "1f01f5c5-94d9-68c0-8000-3d322acaedef",
+      "thread_id": "4afbc61f-2a14-4c3e-bba4-6d0ee69c07aa",
+      "checkpoint_ns": ""
+    },
+    "checkpoint_id": "1f01f5c5-b464-64e8-8001-ce7c444357a4",
+    "parent_checkpoint_id": "1f01f5c5-94d9-68c0-8000-3d322acaedef"
+  },
+  {
+    "values": {
+      "messages": [
+        {
+          "content": "hi i need a quote",
+          "type": "human"
+        }
+      ],
+      "event_history": []
+    },
+    "next": [
+      "planner"
+    ],
+    "tasks": [
+      {
+        "id": "0a65c13e-8450-e324-d522-c02a793dc6e4",
+        "name": "planner",
+        "path": [
+          "__pregel_pull",
+          "planner"
+        ],
+        "error": null,
+        "interrupts": [],
+        "checkpoint": null,
+        "state": null,
+        "result": {
+          "agent_scratchpad": "The customer has requested a quote, but I don't have any of the necessary information to initiate the quote process. I need to gather the primary driver's full name, date of birth, and complete address details. I will use the ask_customer_tool to request this information from the customer.",
+          "requires_agency_review": true,
+          "planned_tool_inputs": null,
+          "human_feedback": null,
+          "last_tool_outputs": null,
+          "action_pending_review": {
+            "tool_name": "ask_customer_tool",
+            "args": {
+              "missing_fields": [
+                "driver_name",
+                "driver_dob",
+                "address_line1",
+                "city",
+                "state_code",
+                "zip_code"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "metadata": {
+      "x-auth-scheme": "langsmith",
+      "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
+      "langgraph_auth_user": null,
+      "langgraph_auth_user_id": "",
+      "langgraph_auth_permissions": [],
+      "graph_id": "ppa_agent_v2",
+      "assistant_id": "e73b8820-3ec2-5b81-94e3-14f0eaa2b133",
+      "user_id": "",
+      "created_by": "system",
+      "from_studio": true,
+      "LANGGRAPH_API_URL": "http://127.0.0.1:2024",
+      "run_attempt": 1,
+      "langgraph_version": "0.3.31",
+      "langgraph_plan": "developer",
+      "langgraph_host": "self-hosted",
+      "langgraph_api_url": "http://127.0.0.1:2024",
+      "thread_id": "4afbc61f-2a14-4c3e-bba4-6d0ee69c07aa",
+      "run_id": "1f01f5c5-8bb2-6740-ae1c-31acaa9c1c27",
+      "source": "loop",
+      "writes": null,
+      "step": 0,
+      "parents": {}
+    },
+    "created_at": "2025-04-22T09:29:54.419499+00:00",
+    "checkpoint": {
+      "checkpoint_id": "1f01f5c5-94d9-68c0-8000-3d322acaedef",
+      "thread_id": "4afbc61f-2a14-4c3e-bba4-6d0ee69c07aa",
+      "checkpoint_ns": ""
+    },
+    "parent_checkpoint": {
+      "checkpoint_id": "1f01f5c5-94d0-6802-bfff-211d31c48655",
+      "thread_id": "4afbc61f-2a14-4c3e-bba4-6d0ee69c07aa",
+      "checkpoint_ns": ""
+    },
+    "checkpoint_id": "1f01f5c5-94d9-68c0-8000-3d322acaedef",
+    "parent_checkpoint_id": "1f01f5c5-94d0-6802-bfff-211d31c48655"
+  },
+  {
+    "values": {
+      "messages": [],
+      "event_history": []
+    },
+    "next": [
+      "__start__"
+    ],
+    "tasks": [
+      {
+        "id": "4c7aa6cb-af36-4a4d-8e01-09b8eaa55080",
+        "name": "__start__",
+        "path": [
+          "__pregel_pull",
+          "__start__"
+        ],
+        "error": null,
+        "interrupts": [],
+        "checkpoint": null,
+        "state": null,
+        "result": {
+          "messages": [
+            {
+              "content": "hi i need a quote",
+              "type": "human"
+            }
+          ]
+        }
+      }
+    ],
+    "metadata": {
+      "x-auth-scheme": "langsmith",
+      "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
+      "langgraph_auth_user": null,
+      "langgraph_auth_user_id": "",
+      "langgraph_auth_permissions": [],
+      "graph_id": "ppa_agent_v2",
+      "assistant_id": "e73b8820-3ec2-5b81-94e3-14f0eaa2b133",
+      "user_id": "",
+      "created_by": "system",
+      "from_studio": true,
+      "LANGGRAPH_API_URL": "http://127.0.0.1:2024",
+      "run_attempt": 1,
+      "langgraph_version": "0.3.31",
+      "langgraph_plan": "developer",
+      "langgraph_host": "self-hosted",
+      "langgraph_api_url": "http://127.0.0.1:2024",
+      "thread_id": "4afbc61f-2a14-4c3e-bba4-6d0ee69c07aa",
+      "run_id": "1f01f5c5-8bb2-6740-ae1c-31acaa9c1c27",
+      "source": "input",
+      "writes": {
+        "__start__": {
+          "messages": [
+            {
+              "content": "hi i need a quote",
+              "type": "human"
+            }
+          ]
+        }
+      },
+      "step": -1,
+      "parents": {}
+    },
+    "created_at": "2025-04-22T09:29:54.415804+00:00",
+    "checkpoint": {
+      "checkpoint_id": "1f01f5c5-94d0-6802-bfff-211d31c48655",
+      "thread_id": "4afbc61f-2a14-4c3e-bba4-6d0ee69c07aa",
+      "checkpoint_ns": ""
+    },
+    "parent_checkpoint": null,
+    "checkpoint_id": "1f01f5c5-94d0-6802-bfff-211d31c48655",
+    "parent_checkpoint_id": null
+  }
+]
