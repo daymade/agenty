@@ -74,7 +74,12 @@ For a detailed diagram and explanation, see the [System Design Document](docs/ag
 
 - [Conda](https://docs.conda.io/en/latest/) (For Python environment management)
 - [Poetry](https://python-poetry.org/) (Used *within* the Conda environment for Python package management)
-- Python 3.11+
+  - **Installation (Recommended):** On Windows, use the official installer via PowerShell:
+    ```powershell
+    (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | py -
+    ```
+    For other systems or alternatives, see the [official Poetry documentation](https://python-poetry.org/docs/#installation).
+- Python 3.12+
 - Google Gemini API key or OpenAI API key
 
 ### Environment Setup

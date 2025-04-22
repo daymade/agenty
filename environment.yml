@@ -1,8 +1,8 @@
-name: ppa-agent
+name: agenty
 channels:
   - conda-forge
   - defaults
 dependencies:
-  - python=3.11
+  - python=3.12
   - pip # Poetry might need pip
 # Other dependencies managed by Poetry via pyproject.toml
