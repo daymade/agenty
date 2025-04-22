@@ -8,78 +8,85 @@ if TYPE_CHECKING:
     from .state import AgentState
 
 # --- Planner Prompt V3 (Simplified - Relies on OpenAI Tool Calling) ---
-PLANNER_PROMPT_TEMPLATE_V3 = """
-You are a PPA Insurance Quoting Agent assistant. Your primary goal is: {goal}.
-You interact with the customer via messages and use internal tools to call Mercury Insurance APIs.
+from langchain.prompts import PromptTemplate
+PLANNER_PROMPT_TEMPLATE_V3 = PromptTemplate(
+    input_variables=["history", "goal", "customer_info", "mercury_session_context", "last_event_result_str", "human_feedback_str", "tool_schemas_json"],
+    template="""You are the 'Planner' component of the PPA New Business AI Agent.
+Your goal: {goal}
 
-**Current Conversation State:**
+**CRITICAL INSTRUCTION: Analyze the ENTIRE conversation history below, including all previous messages, your past plans, tool execution results, and any human feedback, before deciding the next step. Avoid repeating failed actions or getting stuck in loops.**
 
-*   **Conversation History (Newest Last):**
-{messages_str}
-*   **Current Customer Information Extracted:**
-{customer_info_str}
-*   **Mercury API Session Context (e.g., Quote ID):**
-{mercury_session_str}
-*   **Result of the VERY LAST Action Taken:**
-{last_tool_outputs_str}
-*   **Feedback from Last Human Review (if any):**
+**Current State & Context:**
+*   Customer Info: {customer_info}
+*   Mercury API Session Context: {mercury_session_context}
+
+**Conversation History (Oldest to Newest):**
+{history}
+
+**Result of the VERY LAST Event:**
+{last_event_result_str}
+
+**Human Feedback on Previous Action (if any):**
 {human_feedback_str}
 
 **Your Task:**
-
-Based on the current state, conversation, AND HUMAN FEEDBACK (if provided), decide the single next best action.
-
-1.  **Process Human Feedback:** If feedback exists (not 'None'), **you MUST address it**. Re-evaluate your previous plan based on the comment or use the edited inputs if provided. Do NOT repeat the rejected action without changes unless the feedback allows it.
-2.  **Analyze State & Goal:** Review history, current data, goal, and last action result. What's the next logical step in the quoting sequence (e.g., Initiate -> Add Driver -> Add Vehicle -> Rate -> Summarize)? Handle errors from the last step.
-3.  **Determine Next Step & Formulate Plan:**
-    *   If ready to call an API or summarize: Use the appropriate tool with the correct arguments.
-    *   If customer information is needed: Use the `ask_customer_tool` with specific `missing_fields`.
-    *   **IMPORTANT WAIT CONDITION:** If the 'Result of the VERY LAST Action Taken' indicates `ask_customer_tool` was successfully executed, your ONLY valid next step is to wait for the customer response. State clearly that you are waiting. Do NOT use any other tool.
-    *   If stuck or error unrecoverable: Use `request_human_review_tool` (if available and necessary).
-    *   If goal met: Use `prepare_final_summary_tool` or indicate completion in your response.
+Based on the full context above, decide the single best next step. You have access to the following tools:
 
 **Available Tools:**
 ```json
 {tool_schemas_json}
 ```
-*IMPORTANT*: When specifying a tool in your action, use ONLY the base tool name listed above (e.g., "ask_customer_tool", "initiate_quote_tool"), not the fully qualified name.
 
-**Agent Graph Structure (Mermaid Syntax):**
-```mermaid
-{graph_mermaid_syntax}
-```
+**Decision Process:**
+1.  **Review History & State:** Understand the full conversation flow and current status.
+2.  **Identify Next Step:** Determine the most logical action towards the goal.
+3.  **Select Tool (if needed):** Choose the appropriate tool and formulate the arguments required by its schema.
+4.  **Agency Review Check:** Does this specific action require agency review? (Refer to tools marked with `Requires Agency Review: True` in their description). If yes, set `requires_agency_review` to `true`.
+5.  **Wait Condition:** If the 'Result of the VERY LAST Event' indicates a tool like `ask_customer_tool` was successfully executed, your ONLY valid next step is usually to wait for the customer response. Set `action` to `null` in this case.
+6.  **Formulate Output:** Structure your decision in the JSON format below.
 
-Based on your analysis, please respond with a JSON object in the following format:
+**Output Format:** Always respond using the following JSON structure ONLY. Do not add any text before or after the JSON block.
 
 ```json
 {{
-  "thought": "<Your step-by-step reasoning for the chosen action, addressing goals, history, and feedback>",
-  "action": {{
-    "tool_name": "<name_of_tool_to_use>",
-    "tool_inputs": {{
-      "<argument_name>": "<argument_value>",
-      ...
-    }}
-  }}
-  // OR, if waiting for customer:
-  // "action": "WAIT_FOR_CUSTOMER"
+  "thought": "Your reasoning for choosing the next action, considering the history, state, goal, and available tools. Explain *why* this is the best next step.",
+  "action": {{ // Use null if waiting for customer
+    "tool_name": "tool_name_to_use",
+    "args": {{ /* Arguments matching the tool's schema */ }}
+  }},
+  "requires_agency_review": boolean // True if the chosen action needs human approval, False otherwise
 }}
 ```
 
-**Instructions:** Fill the `thought` field with your reasoning. Then, based on that reasoning, either populate the `action` field with the tool call details (using the *short* tool name) OR set the `action` field to the exact string `"WAIT_FOR_CUSTOMER"` if you determined waiting is the correct next step.
+**Example Output (Calling a tool):**
+```json
+{{
+  "thought": "The customer provided their name and DOB. I need their address next. I will use the ask_customer_tool.",
+  "action": {{
+    "tool_name": "ask_customer_tool",
+    "args": {{"question": "Thank you! Could you please provide your current residential address?"}}
+  }},
+  "requires_agency_review": true
+}}
+```
 
+**Example Output (Waiting for customer after asking a question):**
+```json
+{{
+  "thought": "I have just asked the customer for their address using ask_customer_tool. Now I need to wait for their response.",
+  "action": null, // Set action to null to wait
+  "requires_agency_review": false // Waiting doesn't require review
+}}
+```
+
+**Begin! Analyze the state and history, then provide your JSON output.**
 """
+)
 
-def format_planner_prompt(
-    state: 'AgentState',
-    tools: List[Any],
-    current_tool_outputs: Optional[Dict[str, Any]] = None,
-    human_feedback_str: Optional[str] = None, # Pass formatted feedback string directly
-    graph_mermaid_syntax: Optional[str] = None # Pass mermaid syntax for graph
-) -> str:
-    """Formats the prompt for the planner LLM (V3 - includes feedback & graph diagram).
-    Uses explicitly passed tool outputs, feedback string, and mermaid syntax for prompt generation.
-    """
+from langchain.tools.render import render_text_description
+
+def format_planner_prompt(state: 'AgentState', tools: List['BaseTool']) -> Dict[str, Any]:
+    """Formats the input for the planner LLM call based on the current AgentState and available tools."""
     from .state import AgentState # Import locally for type hint if needed
     from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, BaseMessage # For type checking
 
@@ -97,25 +104,31 @@ def format_planner_prompt(
          content_str = str(m.content) if m.content is not None else "" 
          msg_parts.append(f"{role}: {content_str}")
 
-    messages_str = "\n".join(msg_parts)
-    if not messages_str: messages_str = "No messages yet."
+    history_str = "\n".join(msg_parts)
+    if not history_str: history_str = "No messages yet."
 
     # Ensure complex objects are serialized safely (e.g., handling non-serializable types)
     customer_info_str = json.dumps(state.customer_info or {}, indent=2, default=str)
     mercury_session_str = json.dumps(state.mercury_session or {}, indent=2, default=str)
-    # Use the passed current_tool_outputs for the prompt
-    last_tool_outputs_str = json.dumps(current_tool_outputs or {"status": "N/A"}, indent=2, default=str)
+
+    # Format Last Event Result from Event History
+    event_history = state.event_history
+    if event_history:
+        last_event = event_history[-1] # Get the most recent event
+        last_event_result_str = f"Type: {last_event.get('type', 'unknown')}\nDetails: {json.dumps({k: v for k, v in last_event.items() if k != 'type'}, indent=2)}"
+    else:
+        last_event_result_str = "No previous tool execution or human feedback recorded in this session yet."
 
     # Use the passed human_feedback_str directly
-    final_human_feedback_str = human_feedback_str if human_feedback_str is not None else "None"
-    # --- Previous logic for formatting feedback from state (now handled in planner node) --- #
-    # human_feedback_str = "None"
-    # if state.human_feedback:
-    #     feedback = state.human_feedback
-    #     feedback_status = "approved" if feedback.get("approved", False) else "rejected"
-    #     feedback_comment = feedback.get("comment", "No comment provided.")
-    #     human_feedback_str = f"Status: {feedback_status}. Comment: {feedback_comment}"
-    # --- End previous logic --- #
+    final_human_feedback_str = "None"
+    if state.human_feedback:
+        feedback = state.human_feedback
+        feedback_status = "approved" if feedback.get("approved", False) else "rejected"
+        feedback_comment = feedback.get("comment", "No comment provided.")
+        final_human_feedback_str = f"Status: {feedback_status}. Comment: {feedback_comment}"
+
+    # Format tool schemas for the prompt
+    rendered_tools = render_text_description(tools) # <-- Use 'tools' argument
 
     # Format tool schemas for the prompt
     tool_schemas = {}
@@ -126,18 +139,25 @@ def format_planner_prompt(
             tool_schemas[tool.name] = {} # Tool has no args
     tool_schemas_json = json.dumps(tool_schemas, indent=2)
 
-    # Prepare the final prompt
-    prompt = PLANNER_PROMPT_TEMPLATE_V3.format(
-        goal=state.goal or "Process the PPA insurance quote request.",
-        messages_str=messages_str,
-        customer_info_str=customer_info_str,
-        mercury_session_str=mercury_session_str,
-        last_tool_outputs_str=last_tool_outputs_str,
-        human_feedback_str=final_human_feedback_str,
-        tool_schemas_json=tool_schemas_json,
-        graph_mermaid_syntax=graph_mermaid_syntax or "Graph not available",
-    )
-    return prompt
+    # Prepare the final prompt inputs dictionary using the correct keys
+    # Keys MUST match PLANNER_PROMPT_TEMPLATE_V3.input_variables
+    prompt_inputs = {
+        "goal": state.goal or "Process the PPA insurance quote request.",
+        "history": history_str,                       # Use 'history' key
+        "customer_info": customer_info_str,             # Use 'customer_info' key
+        "mercury_session_context": mercury_session_str, # Use 'mercury_session_context' key
+        "last_event_result_str": last_event_result_str,  # Use 'last_event_result_str' key
+        "human_feedback_str": final_human_feedback_str, # Use 'human_feedback_str' key
+        "tool_schemas_json": tool_schemas_json,
+    }
+
+    # Use the PromptTemplate's invoke method to format the prompt
+    # This typically returns a PromptValue (e.g., StringPromptValue)
+    # which is suitable for the LLM's ainvoke method.
+    formatted_prompt_value = PLANNER_PROMPT_TEMPLATE_V3.invoke(prompt_inputs)
+
+    # The LangChain node expects the formatted prompt object (e.g., PromptValue)
+    return formatted_prompt_value
 
 # Template for generating info request (needed by ask_customer_tool)
 GENERATE_INFO_REQUEST_PROMPT_TEMPLATE = """

@@ -11,7 +11,7 @@ from .config import (
     PLANNER_NODE_NAME,
     EXECUTOR_NO_REVIEW_NODE_NAME,
     AGENCY_REVIEW_NODE_NAME,
-    CUSTOMER_WAIT_NODE_NAME
+    CUSTOMER_WAIT_NODE_NAME,
 )
 from .nodes import (
     planner_node,
@@ -24,54 +24,60 @@ from .nodes import (
 TOOLS_REQUIRING_REVIEW = {
     # Add tool names that need human oversight
     # Example: "initiate_quote_tool", "add_vehicle_tool"
-    "initiate_quote_tool" # Example - adjust as needed
+    "initiate_quote_tool", # Example - adjust as needed
+    "ask_customer_tool"  # Always review before sending messages to customer
 }
 
-# --- Conditional Edge Logic from Planner --- #
+# --- Graph Conditional Edges --- #
+
 def check_planner_output(state: AgentState) -> str:
-    """
-    Routes control based on the planner's decision stored in planned_tool_inputs.
-    - If no tool is planned, assumes LLM wants to wait for customer.
-    - If ask_customer_tool is planned, routes to wait.
-    - If another tool is planned, checks if it requires review.
-    """
-    logger.info("--- Checking Planner Output for Routing ---")
-    planned_tool = state.planned_tool_inputs
+    """Determines the next step based on the planner's output and human feedback status."""
+    logger.info("--- Checking Planner Output for Routing --- ")
+    last_output = state.last_tool_outputs
 
-    if planned_tool is None:
-        # This occurs if the LLM explicitly outputted 'WAIT_FOR_CUSTOMER' action.
-        logger.info("No tool planned. Assuming wait for customer input. Routing to customer wait node.")
-        return CUSTOMER_WAIT_NODE_NAME
-
-    # Tool *is* planned
-    if isinstance(planned_tool, dict):
-        tool_name = planned_tool.get("tool_name")
-        if not tool_name:
-             logger.error("Planned tool inputs exist but missing 'tool_name'. Routing to END to prevent loop.")
-             return END # Avoid infinite loops if plan is malformed
-
-        logger.info(f"Planner decided to use tool: {tool_name}")
-
-        # Check against the fully qualified name the LLM seems to be using
-        if tool_name == "functions.ask_customer_tool":
-            logger.info("Tool is ask_customer_tool. Routing to customer wait node.")
-            return CUSTOMER_WAIT_NODE_NAME
-
-        if tool_name in TOOLS_REQUIRING_REVIEW:
-            logger.info(f"Tool '{tool_name}' requires review. Routing to agency review node.")
-            return AGENCY_REVIEW_NODE_NAME
-        else:
-            logger.info(f"Tool '{tool_name}' does not require review. Routing to execution node.")
+    # 1. Check for Human Feedback Status first
+    if isinstance(last_output, dict):
+        feedback_status = last_output.get("status")
+        if feedback_status == "approved_by_human":
+            approved_tool = last_output.get('tool_name', 'unknown')
+            logger.info(f"Detected human approval for tool: {approved_tool}. Routing to executor.")
+            # Sanity check: Ensure the approved action is actually in planned_tool_inputs
+            if state.planned_tool_inputs:
+                logger.debug(f"Approved action details found in planned_tool_inputs: {state.planned_tool_inputs}")
+            else:
+                # This case *shouldn't* happen with the new logic, but log if it does.
+                logger.warning(f"Human approval status detected, but planned_tool_inputs is empty! Routing to executor based on status.")
             return EXECUTOR_NO_REVIEW_NODE_NAME
-    else:
-        # Should not happen if planner node works correctly, but handle defensively
-        logger.error(f"Planned tool inputs is not a dictionary or None: {planned_tool}. Routing to END.")
-        return END
+        elif feedback_status == "rejected_by_human":
+            rejected_tool = last_output.get('tool_name', 'unknown')
+            logger.info(f"Detected human rejection for tool: {rejected_tool}. Routing back to planner for replanning.")
+            return PLANNER_NODE_NAME
+        elif feedback_status == "error" and last_output.get("message") == "Error processing feedback.":
+             # If feedback processing itself failed, go back to planner
+             logger.error("Error processing human feedback detected. Routing back to planner.")
+             return PLANNER_NODE_NAME
 
+    # 2. If no feedback processed in this step, check if review is required for a pending action
+    if state.requires_agency_review:
+        pending_action = state.action_pending_review
+        tool_name = pending_action.get('tool_name', 'unknown') if isinstance(pending_action, dict) else 'unknown'
+        logger.info(f"Planner requires agency review for planned action: {tool_name}. Routing to review pause.")
+        return AGENCY_REVIEW_NODE_NAME
+
+    # 3. If no review required, check if an action is planned for direct execution
+    if state.planned_tool_inputs:
+        tool_name = state.planned_tool_inputs.get('tool_name', 'unknown')
+        logger.info(f"Planner decided to execute tool '{tool_name}' without review. Routing to executor.")
+        return EXECUTOR_NO_REVIEW_NODE_NAME
+
+    # 4. If no action planned and no review needed, assume waiting for customer
+    # (This relies on the planner outputting action: null when waiting)
+    logger.info("No action planned or pending review. Assuming wait for customer input. Routing to wait pause.")
+    return CUSTOMER_WAIT_NODE_NAME
 
 # --- Build Agent Graph ---
 def build_agent_graph() -> CompiledStateGraph:
-    """Builds and compiles the LangGraph StateGraph for the PPA Agentic V2."""
+    """Builds the LangGraph StateGraph for the PPA Agent V2."""
     logger.info("Building agent graph structure...")
     graph = StateGraph(AgentState)
 
@@ -92,7 +98,7 @@ def build_agent_graph() -> CompiledStateGraph:
             AGENCY_REVIEW_NODE_NAME: AGENCY_REVIEW_NODE_NAME,
             EXECUTOR_NO_REVIEW_NODE_NAME: EXECUTOR_NO_REVIEW_NODE_NAME, 
             CUSTOMER_WAIT_NODE_NAME: CUSTOMER_WAIT_NODE_NAME, 
-            END: END,
+            PLANNER_NODE_NAME: PLANNER_NODE_NAME,
         }
     )
 

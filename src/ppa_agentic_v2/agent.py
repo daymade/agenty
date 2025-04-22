@@ -9,24 +9,20 @@ from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import BaseTool, tool
 from pydantic import ValidationError, BaseModel, Field 
 from langgraph.prebuilt import ToolNode 
-from langgraph.checkpoint.sqlite import SqliteSaver
-import sqlite3 
-from langchain_core.utils.function_calling import convert_to_openai_tool 
-from .state import AgentState
-from .tools import all_tools, TOOL_MAP 
-from .config import ( 
-    SQLITE_DB_NAME, GOOGLE_API_KEY, OPENAI_API_KEY, 
-    DEFAULT_LLM_PROVIDER, GOOGLE_MODEL_NAME, OPENAI_MODEL_NAME, logger
-)
-from .prompts import format_planner_prompt 
-from .llm import get_llm_client 
-from langchain_core.messages import AIMessage 
 import uuid 
 import re 
 from langchain_core.exceptions import OutputParserException 
 from pydantic import ValidationError 
 from .llm_setup import llm, llm_with_tools # Import initialized LLMs
 from .graph import build_agent_graph, PLANNER_NODE_NAME, EXECUTOR_NO_REVIEW_NODE_NAME, AGENCY_REVIEW_NODE_NAME, CUSTOMER_WAIT_NODE_NAME, START, END # Import the correct build_agent_graph
+from .state import AgentState
+from .tools import all_tools, TOOL_MAP 
+from .config import ( 
+    GOOGLE_API_KEY, OPENAI_API_KEY, 
+    DEFAULT_LLM_PROVIDER, GOOGLE_MODEL_NAME, OPENAI_MODEL_NAME, logger
+)
+from .prompts import format_planner_prompt 
+from .llm import get_llm_client 
 
 # --- Constants ---
 PLANNER_NODE_NAME = "planner"
@@ -88,12 +84,10 @@ class PPAAgentRunner:
 
     def __init__(self):
         logger.info("Initializing PPAAgentRunner...")
-        # Get the graph builder
-        self.app = build_agent_graph()
-        logger.info("Agent graph compiled.")
 
-        # Define the checkpointer
-        memory = SqliteSaver.from_conn_string(SQLITE_DB_NAME)
+        # Get the graph builder
+        self.app = build_agent_graph() # Call without checkpointer
+        logger.info("Agent graph compiled.") # Update log message
 
         # Generate and store mermaid syntax *after* compilation
         try:
@@ -147,11 +141,11 @@ class PPAAgentRunner:
                     }
                     update["requires_agency_review"] = tool_call.get("requires_review", False)
                     update["agent_scratchpad"] = tool_call.get("log", "Planning to use tool: " + tool_call.get("tool_name", "Unknown"))
-                    update["wait_signal"] = False
+                    update["is_waiting_for_customer"] = False
                 except Exception as e:
                     logger.error(f"Failed to parse tool args: {e}")
                     update["agent_scratchpad"] = f"Error: Planner failed to parse tool args for {tool_name}. Args: {tool_call['args']}"
-                    update["wait_signal"] = False
+                    update["is_waiting_for_customer"] = False
             else:
                 # No tool call, LLM provided a response or decided to wait
                 logger.info("Planner decided on final answer/no tool.")
@@ -160,14 +154,14 @@ class PPAAgentRunner:
                 # Check if the LLM explicitly stated it is waiting
                 if "wait" in llm_content.lower() or "waiting for customer" in llm_content.lower():
                     logger.info("LLM response indicates waiting for customer.")
-                    update["wait_signal"] = True
+                    update["is_waiting_for_customer"] = True
                 else:
-                    update["wait_signal"] = False
+                    update["is_waiting_for_customer"] = False
 
         except Exception as e:
             logger.error(f"Unexpected error during planner LLM invocation/parsing: {e}", exc_info=True)
             update["agent_scratchpad"] = f"Error: An unexpected error occurred in the planner LLM step. Error: {e}"
-            update["wait_signal"] = False
+            update["is_waiting_for_customer"] = False
 
     # --- Planner Node (Instance Method) --- #
     async def planner_node(self, state: AgentState) -> Dict[str, Any]:
