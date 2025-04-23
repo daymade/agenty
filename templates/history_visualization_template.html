@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PPA Agent State History Visualization</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f7f9;
+            color: #333;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 20px auto;
+            background: white;
+            padding: 20px 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+        .header-info {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .header-info code {
+            background: #e9ecef;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+        .step-container {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            background-color: #ffffff;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+            overflow: hidden; /* Contain child margins */
+        }
+        .step-header {
+            background-color: #ecf0f1;
+            padding: 10px 20px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .step-header h2 {
+            margin: 0;
+            font-size: 1.4em;
+            color: #34495e;
+        }
+        .step-header .metadata {
+            font-size: 0.85em;
+            color: #7f8c8d;
+        }
+        .step-header .next-node {
+            font-size: 0.9em;
+            font-weight: bold;
+            color: #2980b9;
+        }
+        .step-content {
+            padding: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .section {
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px dashed #eee;
+        }
+        .section:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+            margin-bottom: 0;
+        }
+        .section h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+            color: #2c3e50;
+            border-bottom: 1px solid #ecf0f1;
+            padding-bottom: 5px;
+        }
+        pre, code {
+            background: #f8f9fa;
+            padding: 10px 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 0.9em;
+            line-height: 1.5;
+            border: 1px solid #eee;
+            white-space: pre-wrap; /* Allow wrapping */
+            word-wrap: break-word; /* Break long words */
+            color: #444;
+        }
+        .messages {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            padding: 0; /* Reset padding */
+            background: #fdfdfd;
+        }
+        .message {
+            padding: 10px 15px;
+            margin: 0;
+            border-bottom: 1px solid #eee;
+        }
+        .message:last-child {
+            border-bottom: none;
+        }
+        .message strong { 
+            display: block; 
+            margin-bottom: 5px; 
+            font-size: 0.9em; 
+            text-transform: uppercase; 
+            letter-spacing: 0.5px; 
+        }
+        .message-human { background-color: #e7f3ff; }
+        .message-human strong { color: #0056b3; }
+        .message-ai { background-color: #e6ffed; }
+        .message-ai strong { color: #155724; }
+        .message-tool { background-color: #fef3cd; }
+        .message-tool strong { color: #856404; }
+        .message-tool pre { background: #fff9e6; border-color: #ffeeba; }
+        .message-content pre { margin-top: 5px; padding: 8px; background: rgba(0,0,0,0.02); border: none; }
+
+        .state-details dl { display: grid; grid-template-columns: auto 1fr; gap: 5px 15px; margin: 0; }
+        .state-details dt { font-weight: bold; color: #555; text-align: right; }
+        .state-details dd { margin: 0; color: #333; }
+        .state-details dd code { padding: 2px 5px; font-size: 0.85em; }
+        .state-details .boolean-true { color: #28a745; font-weight: bold; }
+        .state-details .boolean-false { color: #dc3545; }
+
+        details { border: 1px solid #ddd; border-radius: 4px; margin-bottom: 10px; background: #fafafa;}
+        summary { padding: 10px; background: #f0f0f0; cursor: pointer; font-weight: bold; }
+        details[open] summary { border-bottom: 1px solid #ddd; }
+        .details-content { padding: 15px; }
+
+        /* Full state display */
+        .full-state {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            border: 1px solid #e9ecef;
+        }
+        .full-state h3 {
+            margin-top: 0;
+            font-size: 1.1em;
+        }
+        
+        /* Tabs for event history */
+        .tabs {
+            display: flex;
+            margin-bottom: -1px;
+        }
+        .tab {
+            padding: 8px 15px;
+            cursor: pointer;
+            border: 1px solid #ddd;
+            background: #f8f9fa;
+            margin-right: 5px;
+            border-radius: 4px 4px 0 0;
+        }
+        .tab.active {
+            background: white;
+            border-bottom: 1px solid white;
+        }
+        .tab-content {
+            display: none;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 0 4px 4px 4px;
+        }
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>PPA Agent State History</h1>
+        <div class="header-info">
+            <strong>Thread ID:</strong> <code>{{ thread_id if thread_id else 'N/A' }}</code>
+            <br>
+            <strong>Total Steps:</strong> <code>{{ history|length }}</code>
+        </div>
+
+        {% for step in history %}
+        <div class="step-container">
+            <div class="step-header">
+                <h2>Step {{ loop.index }}</h2>
+                <div>
+                    <span class="next-node">Next Node(s): {{ step.next | join(', ') if step.next else 'END' }}</span><br>
+                    <span class="metadata">Timestamp: {{ step.created_at | format_timestamp if step.created_at else 'N/A' }}</span><br>
+                    <span class="metadata">Checkpoint ID: {{ step.checkpoint_id[:10] }}...</span>
+                </div>
+            </div>
+            <div class="step-content">
+                {# Messages Section #}
+                <div class="section">
+                    <h3>Messages ({{ step.values.messages | length }})</h3>
+                    <div class="messages">
+                        {% if step.values.messages and step.values.messages|length > 0 %}
+                            {% for msg in step.values.messages %}
+                            <div class="message message-{{ msg.type | lower }}">
+                                <strong>{{ msg.type | capitalize }}</strong>
+                                <div class="message-content">
+                                    {# Handle potential non-string content #}
+                                    {% if msg.content is mapping %}
+                                        <pre><code>{{ msg.content | tojson(indent=2) }}</code></pre>
+                                    {% else %}
+                                        <pre>{{ msg.content | default('No Content', true) }}</pre>
+                                    {% endif %}
+                                </div>
+                                {% if msg.type == 'tool' and msg.tool_call_id %}
+                                    <small>Tool Call ID: {{ msg.tool_call_id[:8] }}...</small>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <p style="padding: 10px;">No messages in this state.</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                {# State Details & Planner Section #}
+                <div class="section state-details">
+                    <h3>State Details</h3>
+                    <dl>
+                        <dt>Requires Agency Review:</dt>
+                        <dd><code class="boolean-{{ 'true' if step.values.requires_agency_review else 'false' }}">{{ step.values.requires_agency_review | default('false', true) }}</code></dd>
+
+                        <dt>Agent Scratchpad:</dt>
+                        <dd>
+                            <details>
+                                <summary>Click to view</summary>
+                                <div class="details-content"><pre>{{ step.values.agent_scratchpad | default('N/A', true) }}</pre></div>
+                            </details>
+                        </dd>
+
+                        <dt>Planned Tool Inputs:</dt>
+                        <dd>
+                            <details>
+                                <summary>Click to view</summary>
+                                <div class="details-content"><pre><code>{{ step.values.planned_tool_inputs | default('None', true) | tojson(indent=2) }}</code></pre></div>
+                            </details>
+                        </dd>
+
+                        <dt>Action Pending Review:</dt>
+                        <dd>
+                            <details>
+                                <summary>Click to view</summary>
+                                <div class="details-content"><pre><code>{{ step.values.action_pending_review | default('None', true) | tojson(indent=2) }}</code></pre></div>
+                            </details>
+                        </dd>
+
+                        <dt>Human Feedback:</dt>
+                        <dd>
+                            <details>
+                                <summary>Click to view</summary>
+                                <div class="details-content"><pre><code>{{ step.values.human_feedback | default('None', true) | tojson(indent=2) }}</code></pre></div>
+                            </details>
+                        </dd>
+
+                        <dt>Last Tool Outputs:</dt>
+                        <dd>
+                            <details>
+                                <summary>Click to view</summary>
+                                <div class="details-content">
+                                    {% if step.values.last_tool_outputs %}
+                                        <p><strong>Tool Name:</strong> {{ step.values.last_tool_outputs.tool_name | default('N/A') }}</p>
+                                        <p><strong>Status:</strong> {{ step.values.last_tool_outputs.status | default('N/A') }}</p>
+                                        {% if step.values.last_tool_outputs.result %}
+                                            <pre><code>{{ step.values.last_tool_outputs.result | tojson(indent=2) }}</code></pre>
+                                        {% endif %}
+                                    {% else %}
+                                        <p>None</p>
+                                    {% endif %}
+                                </div>
+                            </details>
+                        </dd>
+
+                        <dt>Event History:</dt>
+                        <dd>
+                            <details>
+                                <summary>Click to view ({{ step.values.event_history | default([], true) | length }} items)</summary>
+                                <div class="details-content">
+                                    {% if step.values.event_history and step.values.event_history|length > 0 %}
+                                        {% for event in step.values.event_history %}
+                                            <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #eee;">
+                                                <p><strong>Type:</strong> {{ event.type }}</p>
+                                                <p><strong>Status:</strong> {{ event.status }}</p>
+                                                {% if event.tool_name %}
+                                                    <p><strong>Tool:</strong> {{ event.tool_name }}</p>
+                                                {% endif %}
+                                                {% if event.message %}
+                                                    <p><strong>Message:</strong> {{ event.message }}</p>
+                                                {% endif %}
+                                                {% if event.result %}
+                                                    <p><strong>Result:</strong></p>
+                                                    <pre><code>{{ event.result | tojson(indent=2) }}</code></pre>
+                                                {% endif %}
+                                            </div>
+                                        {% endfor %}
+                                    {% else %}
+                                        <p>No events recorded</p>
+                                    {% endif %}
+                                </div>
+                            </details>
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+
+            {# Full State Snapshot Section #}
+            <div class="full-state">
+                <h3>Full State Snapshot</h3>
+                <details>
+                    <summary>Click to expand/collapse raw state JSON</summary>
+                    <div class="details-content">
+                        <pre><code>{{ step | tojson(indent=2) }}</code></pre>
+                    </div>
+                </details>
+            </div>
+        </div> {# End step-container #}
+        {% endfor %}
+
+    </div> {# End container #}
+</body>
+</html>
